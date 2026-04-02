@@ -1,0 +1,37 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: betrio
+
+  datasource:
+    url: ${DATABASE_URL}
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+        jdbc:
+          time_zone: UTC
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+logging:
+  level:
+    org.flywaydb: DEBUG
+    ro.betrio.backend: DEBUG
+
+app:
+  provider:
+    api-football:
+      base-url: https://v3.football.api-sports.io
+      api-key: ${API_FOOTBALL_KEY}
+      league-id: ${API_FOOTBALL_LEAGUE_ID}
+      current-season: ${API_FOOTBALL_CURRENT_SEASON:2025}
+      previous-season: ${API_FOOTBALL_PREVIOUS_SEASON:2024}

@@ -1,0 +1,40 @@
+{
+  "groups": [
+    {
+      "name": "app.provider.api-football",
+      "type": "ro.betrio.backend.config.ApiFootballProperties",
+      "sourceType": "ro.betrio.backend.config.ApiFootballProperties"
+    }
+  ],
+  "properties": [
+    {
+      "name": "app.provider.api-football.api-key",
+      "type": "java.lang.String",
+      "sourceType": "ro.betrio.backend.config.ApiFootballProperties"
+    },
+    {
+      "name": "app.provider.api-football.base-url",
+      "type": "java.lang.String",
+      "sourceType": "ro.betrio.backend.config.ApiFootballProperties"
+    },
+    {
+      "name": "app.provider.api-football.current-season",
+      "type": "java.lang.Integer",
+      "sourceType": "ro.betrio.backend.config.ApiFootballProperties"
+    },
+    {
+      "name": "app.provider.api-football.league-id",
+      "type": "java.lang.Long",
+      "sourceType": "ro.betrio.backend.config.ApiFootballProperties"
+    },
+    {
+      "name": "app.provider.api-football.previous-season",
+      "type": "java.lang.Integer",
+      "sourceType": "ro.betrio.backend.config.ApiFootballProperties"
+    }
+  ],
+  "hints": [],
+  "ignored": {
+    "properties": []
+  }
+}
