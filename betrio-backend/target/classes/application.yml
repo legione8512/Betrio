@@ -28,6 +28,8 @@ logging:
     ro.betrio.backend: DEBUG
 
 app:
+  internal-api:
+    base-url: http://localhost:${server.port:8080}
   provider:
     api-football:
       base-url: https://v3.football.api-sports.io

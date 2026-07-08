@@ -59,19 +59,39 @@ public class BootstrapSyncService {
 
     @Transactional
     public void runBootstrapSync() {
-        Competition competition = syncCompetition();
-        Season previousSeason = syncSeason(competition, properties.getPreviousSeason());
-        Season currentSeason = syncSeason(competition, properties.getCurrentSeason());
-
-        syncTeams(previousSeason);
-        syncTeams(currentSeason);
-
-        syncFixtures(previousSeason);
-        syncFixtures(currentSeason);
+        runBootstrapSync(
+                properties.getLeagueId(),
+                properties.getCurrentSeason(),
+                properties.getPreviousSeason()
+        );
     }
 
-    private Competition syncCompetition() {
-        ApiFootballLeagueResponse response = apiFootballClient.getLeagueDetails();
+    @Transactional
+    public void runBootstrapSync(Long leagueId, Integer currentSeason, Integer previousSeason) {
+        if (leagueId == null) {
+            throw new IllegalArgumentException("leagueId must not be null");
+        }
+        if (currentSeason == null) {
+            throw new IllegalArgumentException("currentSeason must not be null");
+        }
+
+        Competition competition = syncCompetition(leagueId, currentSeason);
+
+        if (previousSeason != null) {
+            syncOneSeason(competition, leagueId, previousSeason);
+        }
+
+        syncOneSeason(competition, leagueId, currentSeason);
+    }
+
+    private void syncOneSeason(Competition competition, Long leagueId, int seasonYear) {
+        Season season = syncSeason(competition, seasonYear, leagueId);
+        syncTeams(season, leagueId);
+        syncFixtures(season, leagueId);
+    }
+
+    private Competition syncCompetition(Long leagueId, int seasonYear) {
+        ApiFootballLeagueResponse response = apiFootballClient.getLeagueDetails(leagueId, seasonYear);
 
         if (response == null || response.getResponse() == null || response.getResponse().isEmpty()) {
             throw new IllegalStateException("League details response is empty.");
@@ -93,8 +113,8 @@ public class BootstrapSyncService {
         return competitionRepository.save(competition);
     }
 
-    private Season syncSeason(Competition competition, int seasonYear) {
-        ApiFootballLeagueResponse response = apiFootballClient.getLeagueDetails();
+    private Season syncSeason(Competition competition, int seasonYear, Long leagueId) {
+    	ApiFootballLeagueResponse response = apiFootballClient.getLeagueDetails(leagueId, seasonYear);
 
         if (response == null || response.getResponse() == null || response.getResponse().isEmpty()) {
             throw new IllegalStateException("League details response is empty.");
@@ -130,8 +150,8 @@ public class BootstrapSyncService {
         return seasonRepository.save(season);
     }
 
-    private void syncTeams(Season season) {
-        ApiFootballTeamsResponse response = apiFootballClient.getTeamsBySeason(season.getExternalSeasonYear());
+    private void syncTeams(Season season, Long leagueId) {
+        ApiFootballTeamsResponse response = apiFootballClient.getTeamsBySeason(leagueId, season.getExternalSeasonYear());
 
         if (response == null || response.getResponse() == null) {
             return;
@@ -162,8 +182,8 @@ public class BootstrapSyncService {
         }
     }
 
-    private void syncFixtures(Season season) {
-        ApiFootballFixturesResponse response = apiFootballClient.getFixturesBySeason(season.getExternalSeasonYear());
+    private void syncFixtures(Season season, Long leagueId) {
+        ApiFootballFixturesResponse response = apiFootballClient.getFixturesBySeason(leagueId, season.getExternalSeasonYear());
 
         if (response == null || response.getResponse() == null) {
             return;
@@ -238,11 +258,23 @@ public class BootstrapSyncService {
 
             fixture = fixtureRepository.save(fixture);
 
-            saveFixtureTeam(fixture, homeTeam, "HOME",
-                    item.getTeams() != null && item.getTeams().getHome() != null ? item.getTeams().getHome().getWinner() : null);
+            saveFixtureTeam(
+                    fixture,
+                    homeTeam,
+                    "HOME",
+                    item.getTeams() != null && item.getTeams().getHome() != null
+                            ? item.getTeams().getHome().getWinner()
+                            : null
+            );
 
-            saveFixtureTeam(fixture, awayTeam, "AWAY",
-                    item.getTeams() != null && item.getTeams().getAway() != null ? item.getTeams().getAway().getWinner() : null);
+            saveFixtureTeam(
+                    fixture,
+                    awayTeam,
+                    "AWAY",
+                    item.getTeams() != null && item.getTeams().getAway() != null
+                            ? item.getTeams().getAway().getWinner()
+                            : null
+            );
         }
     }
 

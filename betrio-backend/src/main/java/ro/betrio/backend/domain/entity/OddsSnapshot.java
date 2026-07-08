@@ -46,4 +46,7 @@ public class OddsSnapshot {
     public void setOutcomeName(String outcomeName) { this.outcomeName = outcomeName; }
     public Double getOddValue() { return oddValue; }
     public void setOddValue(Double oddValue) { this.oddValue = oddValue; }
+    public OffsetDateTime getCapturedAt() {
+        return capturedAt;
+    }
 }

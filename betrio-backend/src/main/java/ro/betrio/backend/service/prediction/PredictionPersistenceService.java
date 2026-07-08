@@ -2,6 +2,9 @@ package ro.betrio.backend.service.prediction;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import java.util.List;
+
+import org.springframework.data.domain.PageRequest;
 
 import ro.betrio.backend.api.dto.ExactScoreDto;
 import ro.betrio.backend.api.dto.MatchFeatureSnapshotDto;
@@ -71,5 +74,50 @@ public class PredictionPersistenceService {
         }
 
         return run.getId();
+    }
+    @Transactional
+    public String generateAndStorePredictionsForUpcomingCompetition(Long competitionId, int limit) {
+        int safeLimit = Math.max(1, Math.min(limit, 200));
+
+        List<Fixture> fixtures = fixtureRepository.findUpcomingWithTeamsByCompetition(
+                competitionId,
+                PageRequest.of(0, safeLimit)
+        );
+
+        int created = 0;
+        int skippedExisting = 0;
+
+        StringBuilder createdFixtureIds = new StringBuilder();
+        StringBuilder skippedFixtureIds = new StringBuilder();
+
+        for (Fixture fixture : fixtures) {
+            boolean alreadyExists = predictionRunRepository
+                    .findTopByFixtureIdOrderByGeneratedAtDesc(fixture.getId())
+                    .isPresent();
+
+            if (alreadyExists) {
+                skippedExisting++;
+                if (skippedFixtureIds.length() > 0) {
+                    skippedFixtureIds.append(",");
+                }
+                skippedFixtureIds.append(fixture.getId());
+                continue;
+            }
+
+            generateAndStorePrediction(fixture.getId());
+            created++;
+
+            if (createdFixtureIds.length() > 0) {
+                createdFixtureIds.append(",");
+            }
+            createdFixtureIds.append(fixture.getId());
+        }
+
+        return "Batch prediction capture completed for competitionId=" + competitionId
+                + ". fixturesFound=" + fixtures.size()
+                + ", created=" + created
+                + ", skippedExisting=" + skippedExisting
+                + ", createdFixtureIds=[" + createdFixtureIds + "]"
+                + ", skippedFixtureIds=[" + skippedFixtureIds + "]";
     }
 }

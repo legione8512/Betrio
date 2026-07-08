@@ -88,4 +88,14 @@ public interface PredictionEvaluationRepository extends JpaRepository<Prediction
         order by pe.evaluatedAt desc
         """)
     List<PredictionEvaluation> findByTeamId(Long teamId);
+    @Query("""
+            select pe
+            from PredictionEvaluation pe
+            join fetch pe.predictionRun pr
+            join fetch pr.fixture f
+            join fetch f.homeTeam
+            join fetch f.awayTeam
+            order by pe.evaluatedAt desc
+            """)
+    List<PredictionEvaluation> findRecentWithFixture(Pageable pageable);
 }
