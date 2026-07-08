@@ -13,10 +13,8 @@ spring:
       ddl-auto: validate
     open-in-view: false
     properties:
-      hibernate:
-        format_sql: true
-        jdbc:
-          time_zone: UTC
+      "[hibernate.format_sql]": true
+      "[hibernate.jdbc.time_zone]": UTC
 
   flyway:
     enabled: true
@@ -24,12 +22,10 @@ spring:
 
 logging:
   level:
-    org.flywaydb: DEBUG
-    ro.betrio.backend: DEBUG
+    "[org.flywaydb]": DEBUG
+    "[ro.betrio.backend]": DEBUG
 
 app:
-  internal-api:
-    base-url: http://localhost:${server.port:8080}
   provider:
     api-football:
       base-url: https://v3.football.api-sports.io

@@ -9,19 +9,11 @@ import org.springframework.stereotype.Service;
 import ro.betrio.backend.api.dto.ExactScoreDto;
 import ro.betrio.backend.api.dto.MatchFeatureSnapshotDto;
 import ro.betrio.backend.api.dto.MatchPredictionDto;
-import ro.betrio.backend.service.analysis.FeatureBuilderService;
 
 @Service
 public class ProbabilityEngineService {
 
-    private final FeatureBuilderService featureBuilderService;
-
-    public ProbabilityEngineService(FeatureBuilderService featureBuilderService) {
-        this.featureBuilderService = featureBuilderService;
-    }
-
-    public MatchPredictionDto predictForFixture(Long fixtureId) {
-        MatchFeatureSnapshotDto features = featureBuilderService.buildForFixture(fixtureId);
+    public MatchPredictionDto predict(MatchFeatureSnapshotDto features) {
 
         double homeLambda = features.expectedHomeGoals();
         double awayLambda = features.expectedAwayGoals();
@@ -60,7 +52,7 @@ public class ProbabilityEngineService {
         List<ExactScoreDto> topFive = exactScores.stream().limit(5).toList();
 
         return new MatchPredictionDto(
-                fixtureId,
+                features.fixtureId(),
                 round4(homeWin),
                 round4(draw),
                 round4(awayWin),

@@ -12,20 +12,16 @@ import ro.betrio.backend.api.dto.report.RecentEvaluationDto;
 import ro.betrio.backend.api.dto.report.TeamPerformanceReportDto;
 import ro.betrio.backend.domain.entity.Fixture;
 import ro.betrio.backend.domain.entity.PredictionEvaluation;
-import ro.betrio.backend.repository.FixtureRepository;
 import ro.betrio.backend.repository.PredictionEvaluationRepository;
 
 @Service
 public class ReportingService {
 
     private final PredictionEvaluationRepository predictionEvaluationRepository;
-    private final FixtureRepository fixtureRepository;
 
     public ReportingService(
-            PredictionEvaluationRepository predictionEvaluationRepository,
-            FixtureRepository fixtureRepository) {
+            PredictionEvaluationRepository predictionEvaluationRepository) {
         this.predictionEvaluationRepository = predictionEvaluationRepository;
-        this.fixtureRepository = fixtureRepository;
     }
 
     @Transactional(readOnly = true)

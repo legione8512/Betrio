@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { getJson } from "../api/http.js";
 import { ErrorBlock, LoadingBlock, SectionCard } from "../components/ui.jsx";
+import { formatDateTime } from "../utils/formatters.js";
 
 export function FixturesPage({ competitionId, competition }) {
   const [query, setQuery] = useState("");
@@ -166,7 +167,7 @@ export function FixturesPage({ competitionId, competition }) {
                 {data.items.map((item) => (
                   <tr key={item.fixtureId}>
                     <td>{item.fixtureId}</td>
-                    <td>{item.kickoffAt}</td>
+                    <td>{formatDateTime(item.kickoffAt)}</td>
                     <td>{item.statusShort}</td>
                     <td>{item.leagueRound ?? "-"}</td>
                     <td>{item.homeTeamName}</td>

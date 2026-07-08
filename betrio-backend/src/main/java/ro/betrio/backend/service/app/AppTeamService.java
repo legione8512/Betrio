@@ -1,6 +1,7 @@
 package ro.betrio.backend.service.app;
 
 import java.time.OffsetDateTime;
+import java.util.Objects;
 import java.util.List;
 
 import org.springframework.data.domain.PageRequest;
@@ -29,55 +30,97 @@ public class AppTeamService {
 
     @Transactional(readOnly = true)
     public TeamOverviewDto getTeamOverview(Long teamId) {
+
         Team team = teamRepository.findById(teamId)
-                .orElseThrow(() -> new IllegalStateException("Team not found: " + teamId));
+                .orElseThrow(() ->
+                        new IllegalStateException(
+                                "Team not found: " + teamId
+                        )
+                );
 
-        List<Fixture> recentFixtures = fixtureRepository.findRecentCompletedFixturesForTeam(
-                teamId,
-                OffsetDateTime.now(),
-                PageRequest.of(0, 5)
-        );
+        List<Fixture> recentFixtures =
+                fixtureRepository
+                        .findRecentCompletedFixturesForTeam(
+                                team.getProviderName(),
+                                team.getExternalTeamId(),
+                                OffsetDateTime.now(),
+                                PageRequest.of(0, 5)
+                        );
 
-        List<Fixture> upcomingFixtures = fixtureRepository.findUpcomingFixturesForTeam(
-                teamId,
-                OffsetDateTime.now(),
-                PageRequest.of(0, 5)
-        );
+        /*
+         * Meciurile viitoare sunt din sezonul curent,
+         * deci aici ID-ul intern rămâne corect.
+         */
+        List<Fixture> upcomingFixtures =
+                fixtureRepository.findUpcomingFixturesForTeam(
+                        team.getId(),
+                        OffsetDateTime.now(),
+                        PageRequest.of(0, 5)
+                );
 
-        TeamOverviewDto.Summary summary = buildOverviewSummary(teamId, recentFixtures);
+        TeamOverviewDto.Summary summary =
+                buildOverviewSummary(team, recentFixtures);
 
         return new TeamOverviewDto(
                 team.getId(),
                 team.getTeamName(),
                 summary,
-                recentFixtures.stream().map(f -> toOverviewMatchItem(teamId, f)).toList(),
-                upcomingFixtures.stream().map(f -> toOverviewMatchItem(teamId, f)).toList()
+                recentFixtures.stream()
+                        .map(f -> toOverviewMatchItem(team, f))
+                        .toList(),
+                upcomingFixtures.stream()
+                        .map(f -> toOverviewMatchItem(team, f))
+                        .toList()
         );
     }
 
     @Transactional(readOnly = true)
-    public List<TeamOverviewDto.MatchItem> getRecentMatches(Long teamId, int limit) {
-        List<Fixture> recentFixtures = fixtureRepository.findRecentCompletedFixturesForTeam(
-                teamId,
-                OffsetDateTime.now(),
-                PageRequest.of(0, limit)
-        );
+    public List<TeamOverviewDto.MatchItem> getRecentMatches(
+            Long teamId,
+            int limit) {
+
+        Team team = teamRepository.findById(teamId)
+                .orElseThrow(() ->
+                        new IllegalStateException(
+                                "Team not found: " + teamId
+                        )
+                );
+
+        List<Fixture> recentFixtures =
+                fixtureRepository
+                        .findRecentCompletedFixturesForTeam(
+                                team.getProviderName(),
+                                team.getExternalTeamId(),
+                                OffsetDateTime.now(),
+                                PageRequest.of(0, limit)
+                        );
 
         return recentFixtures.stream()
-                .map(f -> toOverviewMatchItem(teamId, f))
+                .map(f -> toOverviewMatchItem(team, f))
                 .toList();
     }
 
     @Transactional(readOnly = true)
-    public List<TeamOverviewDto.MatchItem> getUpcomingMatches(Long teamId, int limit) {
-        List<Fixture> upcomingFixtures = fixtureRepository.findUpcomingFixturesForTeam(
-                teamId,
-                OffsetDateTime.now(),
-                PageRequest.of(0, limit)
-        );
+    public List<TeamOverviewDto.MatchItem> getUpcomingMatches(
+            Long teamId,
+            int limit) {
+
+        Team team = teamRepository.findById(teamId)
+                .orElseThrow(() ->
+                        new IllegalStateException(
+                                "Team not found: " + teamId
+                        )
+                );
+
+        List<Fixture> upcomingFixtures =
+                fixtureRepository.findUpcomingFixturesForTeam(
+                        team.getId(),
+                        OffsetDateTime.now(),
+                        PageRequest.of(0, limit)
+                );
 
         return upcomingFixtures.stream()
-                .map(f -> toOverviewMatchItem(teamId, f))
+                .map(f -> toOverviewMatchItem(team, f))
                 .toList();
     }
 
@@ -86,23 +129,32 @@ public class AppTeamService {
         Team team = teamRepository.findById(teamId)
                 .orElseThrow(() -> new IllegalStateException("Team not found: " + teamId));
 
-        List<Fixture> fixtures = fixtureRepository.findRecentCompletedFixturesForTeam(
-                teamId,
-                OffsetDateTime.now(),
-                PageRequest.of(0, limit)
-        );
+        List<Fixture> fixtures =
+                fixtureRepository.findRecentCompletedFixturesForTeam(
+                        team.getProviderName(),
+                        team.getExternalTeamId(),
+                        OffsetDateTime.now(),
+                        PageRequest.of(0, limit)
+                );
 
-        TeamFormDto.FormSummary overall = buildFormSummary(teamId, fixtures);
-        TeamFormDto.VenueSummary home = buildVenueSummary(teamId, fixtures, true);
-        TeamFormDto.VenueSummary away = buildVenueSummary(teamId, fixtures, false);
-        TeamFormDto.StreakSummary streak = buildStreak(teamId, fixtures);
+        TeamFormDto.FormSummary overall =
+                buildFormSummary(team, fixtures);
+
+        TeamFormDto.VenueSummary home =
+                buildVenueSummary(team, fixtures, true);
+
+        TeamFormDto.VenueSummary away =
+                buildVenueSummary(team, fixtures, false);
+
+        TeamFormDto.StreakSummary streak =
+                buildStreak(team, fixtures);
 
         String formSequence = fixtures.stream()
-                .map(f -> resultCodeForTeam(teamId, f))
+        		.map(f -> resultCodeForTeam(team, f))
                 .reduce("", (a, b) -> a.isEmpty() ? b : a + "-" + b);
 
         List<TeamFormDto.MatchFormItem> items = fixtures.stream()
-                .map(f -> toFormMatchItem(teamId, f))
+        		.map(f -> toFormMatchItem(team, f))
                 .toList();
 
         return new TeamFormDto(
@@ -118,7 +170,7 @@ public class AppTeamService {
         );
     }
 
-    private TeamOverviewDto.Summary buildOverviewSummary(Long teamId, List<Fixture> fixtures) {
+    private TeamOverviewDto.Summary buildOverviewSummary(Team team, List<Fixture> fixtures) {
         int wins = 0;
         int draws = 0;
         int losses = 0;
@@ -126,7 +178,8 @@ public class AppTeamService {
         int goalsAgainst = 0;
 
         for (Fixture fixture : fixtures) {
-            boolean isHome = fixture.getHomeTeam().getId().equals(teamId);
+        	boolean isHome =
+        	        sameTeam(team, fixture.getHomeTeam());
 
             int teamGoals = isHome ? safeInt(fixture.getHomeGoals()) : safeInt(fixture.getAwayGoals());
             int opponentGoals = isHome ? safeInt(fixture.getAwayGoals()) : safeInt(fixture.getHomeGoals());
@@ -162,7 +215,7 @@ public class AppTeamService {
         );
     }
 
-    private TeamFormDto.FormSummary buildFormSummary(Long teamId, List<Fixture> fixtures) {
+    private TeamFormDto.FormSummary buildFormSummary(Team team, List<Fixture> fixtures) {
         int wins = 0;
         int draws = 0;
         int losses = 0;
@@ -174,8 +227,8 @@ public class AppTeamService {
         int over25Count = 0;
 
         for (Fixture fixture : fixtures) {
-            int teamGoals = teamGoals(teamId, fixture);
-            int opponentGoals = opponentGoals(teamId, fixture);
+            int teamGoals = teamGoals(team, fixture);
+            int opponentGoals = opponentGoals(team, fixture);
 
             goalsFor += teamGoals;
             goalsAgainst += opponentGoals;
@@ -223,7 +276,7 @@ public class AppTeamService {
         );
     }
 
-    private TeamFormDto.VenueSummary buildVenueSummary(Long teamId, List<Fixture> fixtures, boolean homeOnly) {
+    private TeamFormDto.VenueSummary buildVenueSummary(Team team, List<Fixture> fixtures, boolean homeOnly) {
         int played = 0;
         int wins = 0;
         int draws = 0;
@@ -232,7 +285,8 @@ public class AppTeamService {
         int goalsAgainst = 0;
 
         for (Fixture fixture : fixtures) {
-            boolean isHome = fixture.getHomeTeam().getId().equals(teamId);
+        	boolean isHome =
+        	        sameTeam(team, fixture.getHomeTeam());
 
             if (isHome != homeOnly) {
                 continue;
@@ -240,8 +294,8 @@ public class AppTeamService {
 
             played++;
 
-            int teamGoals = teamGoals(teamId, fixture);
-            int opponentGoals = opponentGoals(teamId, fixture);
+            int teamGoals = teamGoals(team, fixture);
+            int opponentGoals = opponentGoals(team, fixture);
 
             goalsFor += teamGoals;
             goalsAgainst += opponentGoals;
@@ -266,16 +320,16 @@ public class AppTeamService {
         );
     }
 
-    private TeamFormDto.StreakSummary buildStreak(Long teamId, List<Fixture> fixtures) {
+    private TeamFormDto.StreakSummary buildStreak(Team team, List<Fixture> fixtures) {
         if (fixtures.isEmpty()) {
             return new TeamFormDto.StreakSummary(null, 0);
         }
 
-        String first = resultCodeForTeam(teamId, fixtures.get(0));
+        String first = resultCodeForTeam(team, fixtures.get(0));
         int length = 0;
 
         for (Fixture fixture : fixtures) {
-            String current = resultCodeForTeam(teamId, fixture);
+            String current = resultCodeForTeam(team, fixture);
             if (!first.equals(current)) {
                 break;
             }
@@ -285,8 +339,9 @@ public class AppTeamService {
         return new TeamFormDto.StreakSummary(first, length);
     }
 
-    private TeamOverviewDto.MatchItem toOverviewMatchItem(Long teamId, Fixture fixture) {
-        boolean isHome = fixture.getHomeTeam().getId().equals(teamId);
+    private TeamOverviewDto.MatchItem toOverviewMatchItem(Team team, Fixture fixture) {
+    	boolean isHome =
+    	        sameTeam(team, fixture.getHomeTeam());
 
         String opponentName = isHome
                 ? fixture.getAwayTeam().getTeamName()
@@ -321,10 +376,11 @@ public class AppTeamService {
         );
     }
 
-    private TeamFormDto.MatchFormItem toFormMatchItem(Long teamId, Fixture fixture) {
-        boolean isHome = fixture.getHomeTeam().getId().equals(teamId);
-        int teamGoals = teamGoals(teamId, fixture);
-        int opponentGoals = opponentGoals(teamId, fixture);
+    private TeamFormDto.MatchFormItem toFormMatchItem(Team team, Fixture fixture) {
+    	boolean isHome =
+    	        sameTeam(team, fixture.getHomeTeam());
+        int teamGoals = teamGoals(team, fixture);
+        int opponentGoals = opponentGoals(team, fixture);
 
         return new TeamFormDto.MatchFormItem(
                 fixture.getId(),
@@ -333,7 +389,7 @@ public class AppTeamService {
                 isHome ? fixture.getAwayTeam().getTeamName() : fixture.getHomeTeam().getTeamName(),
                 teamGoals,
                 opponentGoals,
-                resultCodeForTeam(teamId, fixture),
+                resultCodeForTeam(team, fixture),
                 opponentGoals == 0,
                 teamGoals == 0,
                 teamGoals > 0 && opponentGoals > 0,
@@ -341,9 +397,9 @@ public class AppTeamService {
         );
     }
 
-    private String resultCodeForTeam(Long teamId, Fixture fixture) {
-        int teamGoals = teamGoals(teamId, fixture);
-        int opponentGoals = opponentGoals(teamId, fixture);
+    private String resultCodeForTeam(Team team, Fixture fixture) {
+        int teamGoals = teamGoals(team, fixture);
+        int opponentGoals = opponentGoals(team, fixture);
 
         if (teamGoals > opponentGoals) {
             return "W";
@@ -354,14 +410,44 @@ public class AppTeamService {
         return "D";
     }
 
-    private int teamGoals(Long teamId, Fixture fixture) {
-        boolean isHome = fixture.getHomeTeam().getId().equals(teamId);
-        return isHome ? safeInt(fixture.getHomeGoals()) : safeInt(fixture.getAwayGoals());
+    private int teamGoals(
+            Team team,
+            Fixture fixture) {
+
+        boolean isHome =
+                sameTeam(team, fixture.getHomeTeam());
+
+        return isHome
+                ? safeInt(fixture.getHomeGoals())
+                : safeInt(fixture.getAwayGoals());
     }
 
-    private int opponentGoals(Long teamId, Fixture fixture) {
-        boolean isHome = fixture.getHomeTeam().getId().equals(teamId);
-        return isHome ? safeInt(fixture.getAwayGoals()) : safeInt(fixture.getHomeGoals());
+    private int opponentGoals(
+            Team team,
+            Fixture fixture) {
+
+        boolean isHome =
+                sameTeam(team, fixture.getHomeTeam());
+
+        return isHome
+                ? safeInt(fixture.getAwayGoals())
+                : safeInt(fixture.getHomeGoals());
+    }
+    
+    private boolean sameTeam(
+            Team first,
+            Team second) {
+
+        return first != null
+                && second != null
+                && Objects.equals(
+                        first.getProviderName(),
+                        second.getProviderName()
+                )
+                && Objects.equals(
+                        first.getExternalTeamId(),
+                        second.getExternalTeamId()
+                );
     }
 
     private boolean isCompleted(Fixture fixture) {

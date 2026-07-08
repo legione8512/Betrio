@@ -1,6 +1,10 @@
 import React, { useState } from "react";
 import { API_BASE, getJson } from "../api/http.js";
 import { ErrorBlock, JsonBox, LoadingBlock, Metric, SectionCard } from "../components/ui.jsx";
+import {
+  formatDateTime,
+  formatProbability,
+} from "../utils/formatters.js";
 
 export function MatchCenterPage({ competition }) {
   const [fixtureId, setFixtureId] = useState("585");
@@ -141,12 +145,23 @@ export function MatchCenterPage({ competition }) {
         <>
           <SectionCard
             title={`${homeName} vs ${awayName}`}
-            subtitle={`${overview?.kickoffAt ?? "Unknown kickoff"} · ${overview?.statusLong ?? "Unknown status"}`}
+            subtitle={`${formatDateTime(
+  overview?.kickoffAt,
+  "Unknown kickoff"
+)} · ${overview?.statusLong ?? "Unknown status"}`}
           >
             <div className="metrics-grid four">
               <Metric label="Recommendation" value={data.predictionExplanation?.recommendedResultCode ?? "N/A"} />
-              <Metric label="Confidence" value={data.predictionExplanation?.confidenceTier ?? "N/A"} />
-              <Metric label="Totals lean" value={data.predictionExplanation?.overUnderLean ?? "N/A"} />
+<Metric
+  label="Confidence"
+  value={
+    data.predictionExplanation?.confidenceTier
+      ? `${data.predictionExplanation.confidenceTier} · ${formatProbability(
+          data.predictionExplanation.topProbability
+        )}`
+      : "N/A"
+  }
+/>              <Metric label="Totals lean" value={data.predictionExplanation?.overUnderLean ?? "N/A"} />
               <Metric label="BTTS lean" value={data.predictionExplanation?.bttsLean ?? "N/A"} />
             </div>
 

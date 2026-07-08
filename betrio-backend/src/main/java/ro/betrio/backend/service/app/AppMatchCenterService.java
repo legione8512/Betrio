@@ -1,6 +1,10 @@
 package ro.betrio.backend.service.app;
 
 import java.util.function.Supplier;
+import ro.betrio.backend.api.dto.MatchFeatureSnapshotDto;
+import ro.betrio.backend.api.dto.MatchPredictionDto;
+import ro.betrio.backend.service.analysis.FeatureBuilderService;
+import ro.betrio.backend.service.prediction.ProbabilityEngineService;
 
 import org.springframework.stereotype.Service;
 
@@ -18,19 +22,28 @@ public class AppMatchCenterService {
     private final AppH2HService appH2HService;
     private final MarketComparisonService marketComparisonService;
     private final AppTeamService appTeamService;
-    private final AppInternalApiClient appInternalApiClient;
-
+    private final FeatureBuilderService featureBuilderService;
+    private final ProbabilityEngineService probabilityEngineService;
+    private final PredictionExplanationService
+    predictionExplanationService;
+    
     public AppMatchCenterService(
             AppFixtureService appFixtureService,
             AppH2HService appH2HService,
             MarketComparisonService marketComparisonService,
             AppTeamService appTeamService,
-            AppInternalApiClient appInternalApiClient) {
+            FeatureBuilderService featureBuilderService,
+            ProbabilityEngineService probabilityEngineService,
+            PredictionExplanationService predictionExplanationService) {
         this.appFixtureService = appFixtureService;
         this.appH2HService = appH2HService;
         this.marketComparisonService = marketComparisonService;
         this.appTeamService = appTeamService;
-        this.appInternalApiClient = appInternalApiClient;
+        this.featureBuilderService = featureBuilderService;
+        this.probabilityEngineService =
+                probabilityEngineService;
+        this.predictionExplanationService =
+                predictionExplanationService;
     }
 
     public FixtureMatchCenterDto getMatchCenter(Long fixtureId, int h2hLimit, int formLimit) {
@@ -76,23 +89,31 @@ public class AppMatchCenterService {
             );
         }
 
-        Object features = safeCall(
-                () -> appInternalApiClient.getFeatures(fixtureId),
-                "features",
-                fixtureId
-        );
+        MatchFeatureSnapshotDto features =
+                safeCall(
+                        () -> featureBuilderService
+                                .buildForFixture(fixtureId),
+                        "features",
+                        fixtureId
+                );
 
-        Object prediction = safeCall(
-                () -> appInternalApiClient.getPrediction(fixtureId),
-                "prediction",
-                fixtureId
-        );
+        MatchPredictionDto prediction =
+                features == null
+                        ? null
+                        : safeCall(
+                                () -> probabilityEngineService
+                                        .predict(features),
+                                "prediction",
+                                fixtureId
+                        );
 
-        PredictionExplanationDto predictionExplanation = safeCall(
-                () -> buildPredictionExplanation(overview),
-                "predictionExplanation",
-                fixtureId
-        );
+        PredictionExplanationDto predictionExplanation =
+                safeCall(
+                        () -> predictionExplanationService
+                                .build(overview),
+                        "predictionExplanation",
+                        fixtureId
+                );
 
         return new FixtureMatchCenterDto(
                 fixtureId,
@@ -118,83 +139,4 @@ public class AppMatchCenterService {
         }
     }
 
-    private PredictionExplanationDto buildPredictionExplanation(FixtureOverviewDto overview) {
-        if (overview == null || overview.latestPrediction() == null) {
-            return null;
-        }
-
-        FixtureOverviewDto.PredictionSummary p = overview.latestPrediction();
-
-        double home = safe(p.homeWinProbability());
-        double draw = safe(p.drawProbability());
-        double away = safe(p.awayWinProbability());
-
-        double top = Math.max(home, Math.max(draw, away));
-
-        String confidenceTier;
-        if (top >= 0.65) {
-            confidenceTier = "HIGH";
-        } else if (top >= 0.50) {
-            confidenceTier = "MEDIUM";
-        } else {
-            confidenceTier = "LOW";
-        }
-
-        String overUnderLean = null;
-        if (p.over25Probability() != null && p.under25Probability() != null) {
-            overUnderLean = p.over25Probability() >= p.under25Probability() ? "OVER_25" : "UNDER_25";
-        }
-
-        String bttsLean = null;
-        if (p.bttsYesProbability() != null && p.bttsNoProbability() != null) {
-            bttsLean = p.bttsYesProbability() >= p.bttsNoProbability() ? "BTTS_YES" : "BTTS_NO";
-        }
-
-        String summary = buildSummary(
-                p.recommendedResultCode(),
-                top,
-                confidenceTier,
-                overUnderLean,
-                bttsLean
-        );
-
-        return new PredictionExplanationDto(
-                p.recommendedResultCode(),
-                top,
-                confidenceTier,
-                overUnderLean,
-                bttsLean,
-                summary
-        );
-    }
-
-    private String buildSummary(
-            String recommendedResultCode,
-            double topProbability,
-            String confidenceTier,
-            String overUnderLean,
-            String bttsLean) {
-
-        String resultPart = "Model leans " + nullSafe(recommendedResultCode)
-                + " at " + String.format(java.util.Locale.US, "%.1f", topProbability * 100.0)
-                + "% confidence (" + confidenceTier + ").";
-
-        String totalsPart = overUnderLean == null
-                ? ""
-                : " Totals lean " + overUnderLean + ".";
-
-        String bttsPart = bttsLean == null
-                ? ""
-                : " BTTS leans " + bttsLean + ".";
-
-        return resultPart + totalsPart + bttsPart;
-    }
-
-    private double safe(Double value) {
-        return value == null ? 0.0 : value;
-    }
-
-    private String nullSafe(String value) {
-        return value == null ? "UNKNOWN" : value;
-    }
 }

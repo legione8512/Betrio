@@ -2,6 +2,11 @@ import React, { useMemo } from "react";
 import { getJson } from "../api/http.js";
 import { ErrorBlock, JsonBox, LoadingBlock, Metric, SectionCard } from "../components/ui.jsx";
 import { useAsync } from "../components/hooks.js";
+import {
+  formatDateTime,
+  formatDecimal,
+  formatProbability,
+} from "../utils/formatters.js";
 
 export function DashboardPage({ competitionId, competition }) {
   const dashboardPath = useMemo(() => {
@@ -45,12 +50,30 @@ export function DashboardPage({ competitionId, competition }) {
 
       <SectionCard title="Model quality" subtitle="From GET /api/reports/dashboard">
         <div className="metrics-grid three">
-          <Metric label="1X2 accuracy" value={model.data.accuracy1x2} />
-          <Metric label="Over 2.5 accuracy" value={model.data.accuracyOver25} />
-          <Metric label="BTTS accuracy" value={model.data.accuracyBtts} />
-          <Metric label="Exact score hit rate" value={model.data.exactScoreHitRate} />
-          <Metric label="Avg Brier" value={model.data.averageBrierScore1x2} />
-          <Metric label="Avg Log Loss" value={model.data.averageLogLoss1x2} />
+          <Metric
+  label="1X2 accuracy"
+  value={formatProbability(model.data.accuracy1x2)}
+/>
+<Metric
+  label="Over 2.5 accuracy"
+  value={formatProbability(model.data.accuracyOver25)}
+/>
+<Metric
+  label="BTTS accuracy"
+  value={formatProbability(model.data.accuracyBtts)}
+/>
+<Metric
+  label="Exact score hit rate"
+  value={formatProbability(model.data.exactScoreHitRate)}
+/>
+<Metric
+  label="Avg Brier"
+  value={formatDecimal(model.data.averageBrierScore1x2)}
+/>
+<Metric
+  label="Avg Log Loss"
+  value={formatDecimal(model.data.averageLogLoss1x2)}
+/>
         </div>
       </SectionCard>
 
@@ -63,13 +86,16 @@ export function DashboardPage({ competitionId, competition }) {
                   <strong>
                     {pick.homeTeamName} vs {pick.awayTeamName}
                   </strong>
-                  <div className="muted">{pick.kickoffAt}</div>
+                  <div className="muted">
+  {formatDateTime(pick.kickoffAt)}
+</div>
                   <div className="muted">{pick.summary ?? "No summary available."}</div>
                 </div>
 
                 <div className="right-cluster">
                   <span>{pick.recommendedResultCode ?? "N/A"}</span>
                   <span>{pick.confidenceTier ?? "N/A"}</span>
+                  <span>{formatProbability(pick.confidenceScore)}</span>
                 </div>
               </div>
             ))}

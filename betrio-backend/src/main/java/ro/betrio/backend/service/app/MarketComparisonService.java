@@ -28,6 +28,7 @@ public class MarketComparisonService {
             FixtureRepository fixtureRepository,
             PredictionRunRepository predictionRunRepository,
             OddsSnapshotRepository oddsSnapshotRepository) {
+
         this.fixtureRepository = fixtureRepository;
         this.predictionRunRepository = predictionRunRepository;
         this.oddsSnapshotRepository = oddsSnapshotRepository;
@@ -36,13 +37,32 @@ public class MarketComparisonService {
     @Transactional(readOnly = true)
     public FixtureMarketComparisonDto getMarketComparison(Long fixtureId) {
         Fixture fixture = fixtureRepository.findDetailedById(fixtureId)
-                .orElseThrow(() -> new IllegalStateException("Fixture not found: " + fixtureId));
+                .orElseThrow(() ->
+                        new IllegalStateException(
+                                "Fixture not found: " + fixtureId));
 
         PredictionRun latestPrediction = predictionRunRepository
                 .findTopByFixtureIdOrderByGeneratedAtDesc(fixtureId)
-                .orElseThrow(() -> new IllegalStateException("No prediction run found for fixture: " + fixtureId));
+                .orElseThrow(() ->
+                        new IllegalStateException(
+                                "No prediction run found for fixture: "
+                                        + fixtureId));
 
-        List<OddsSnapshot> allSnapshots = oddsSnapshotRepository.findByFixtureIdOrderByCapturedAtDesc(fixtureId);
+        List<OddsSnapshot> allSnapshots =
+                oddsSnapshotRepository
+                        .findByFixtureIdOrderByCapturedAtDesc(fixtureId);
+
+        return buildMarketComparison(
+                fixture,
+                latestPrediction,
+                allSnapshots
+        );
+    }
+
+    public FixtureMarketComparisonDto buildMarketComparison(
+            Fixture fixture,
+            PredictionRun latestPrediction,
+            List<OddsSnapshot> allSnapshots) {
 
         if (allSnapshots.isEmpty()) {
             return new FixtureMarketComparisonDto(
@@ -62,25 +82,30 @@ public class MarketComparisonService {
             );
         }
 
-        OffsetDateTime latestCapturedAt = allSnapshots.get(0).getCapturedAt();
+        OffsetDateTime latestCapturedAt =
+                allSnapshots.get(0).getCapturedAt();
 
         List<OddsSnapshot> latestBatch = allSnapshots.stream()
-                .filter(s -> latestCapturedAt.equals(s.getCapturedAt()))
+                .filter(snapshot ->
+                        latestCapturedAt.equals(snapshot.getCapturedAt()))
                 .filter(this::isOneXTwoMarket)
                 .toList();
 
         Map<String, OddsSnapshot> selectionMap = latestBatch.stream()
                 .collect(Collectors.toMap(
                         this::normalizeOutcome,
-                        s -> s,
-                        (a, b) -> a
+                        snapshot -> snapshot,
+                        (first, duplicate) -> first
                 ));
 
         OddsSnapshot homeSnapshot = selectionMap.get("HOME");
         OddsSnapshot drawSnapshot = selectionMap.get("DRAW");
         OddsSnapshot awaySnapshot = selectionMap.get("AWAY");
 
-        if (homeSnapshot == null || drawSnapshot == null || awaySnapshot == null) {
+        if (homeSnapshot == null
+                || drawSnapshot == null
+                || awaySnapshot == null) {
+
             return new FixtureMarketComparisonDto(
                     fixture.getId(),
                     fixture.getHomeTeam().getTeamName(),
@@ -112,15 +137,21 @@ public class MarketComparisonService {
         double normalizedDraw = rawDraw / sum;
         double normalizedAway = rawAway / sum;
 
-        double modelHome = latestPrediction.getHomeWinProbability();
-        double modelDraw = latestPrediction.getDrawProbability();
-        double modelAway = latestPrediction.getAwayWinProbability();
+        double modelHome =
+                latestPrediction.getHomeWinProbability();
+
+        double modelDraw =
+                latestPrediction.getDrawProbability();
+
+        double modelAway =
+                latestPrediction.getAwayWinProbability();
 
         double edgeHome = modelHome - normalizedHome;
         double edgeDraw = modelDraw - normalizedDraw;
         double edgeAway = modelAway - normalizedAway;
 
-        String bestEdgeSelection = bestEdge(edgeHome, edgeDraw, edgeAway);
+        String bestEdgeSelection =
+                bestEdge(edgeHome, edgeDraw, edgeAway);
 
         return new FixtureMarketComparisonDto(
                 fixture.getId(),
@@ -155,6 +186,7 @@ public class MarketComparisonService {
 
     private boolean isOneXTwoMarket(OddsSnapshot snapshot) {
         String marketName = safe(snapshot.getMarketName());
+
         return marketName.contains("match winner")
                 || marketName.equals("1x2")
                 || marketName.equals("match result");
@@ -167,7 +199,10 @@ public class MarketComparisonService {
             return "HOME";
         }
 
-        if (outcome.equals("x") || outcome.equals("draw") || outcome.equals("tie")) {
+        if (outcome.equals("x")
+                || outcome.equals("draw")
+                || outcome.equals("tie")) {
+
             return "DRAW";
         }
 
@@ -178,7 +213,11 @@ public class MarketComparisonService {
         return "OTHER";
     }
 
-    private String bestEdge(double home, double draw, double away) {
+    private String bestEdge(
+            double home,
+            double draw,
+            double away) {
+
         double max = Math.max(home, Math.max(draw, away));
 
         if (max <= 0.0) {
@@ -188,13 +227,17 @@ public class MarketComparisonService {
         if (max == home) {
             return "HOME";
         }
+
         if (max == away) {
             return "AWAY";
         }
+
         return "DRAW";
     }
 
     private String safe(String value) {
-        return value == null ? "" : value.trim().toLowerCase(Locale.ROOT);
+        return value == null
+                ? ""
+                : value.trim().toLowerCase(Locale.ROOT);
     }
 }

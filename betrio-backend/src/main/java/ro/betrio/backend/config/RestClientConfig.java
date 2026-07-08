@@ -10,7 +10,7 @@ import org.springframework.web.client.RestClient;
 public class RestClientConfig {
 
     @Bean
-    public RestClient apiFootballRestClient(ApiFootballProperties properties) {
+    RestClient apiFootballRestClient(ApiFootballProperties properties) {
         return RestClient.builder()
                 .baseUrl(properties.getBaseUrl())
                 .defaultHeader("x-apisports-key", properties.getApiKey())

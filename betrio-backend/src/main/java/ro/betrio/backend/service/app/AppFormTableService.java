@@ -91,38 +91,54 @@ public class AppFormTableService {
         int safeLimit = Math.max(1, Math.min(limit, 20));
         List<Fixture> seasonFixtures = fixtureRepository.findAllCompletedFixturesForSeason(season);
 
-        Map<Long, String> teams = new LinkedHashMap<>();
+        Map<Long, Team> teams = new LinkedHashMap<>();
 
         for (Team team : teamRepository.findBySeason(season)) {
-            teams.put(team.getId(), team.getTeamName());
+            teams.put(team.getId(), team);
         }
 
         for (Fixture fixture : seasonFixtures) {
             if (fixture.getHomeTeam() != null) {
-                teams.putIfAbsent(fixture.getHomeTeam().getId(), fixture.getHomeTeam().getTeamName());
+                teams.putIfAbsent(
+                        fixture.getHomeTeam().getId(),
+                        fixture.getHomeTeam()
+                );
             }
+
             if (fixture.getAwayTeam() != null) {
-                teams.putIfAbsent(fixture.getAwayTeam().getId(), fixture.getAwayTeam().getTeamName());
+                teams.putIfAbsent(
+                        fixture.getAwayTeam().getId(),
+                        fixture.getAwayTeam()
+                );
             }
         }
 
         List<LeagueFormTableDto.Row> rows = new ArrayList<>();
 
-        for (Map.Entry<Long, String> entry : teams.entrySet()) {
-            Long teamId = entry.getKey();
-            String teamName = entry.getValue();
+        for (Map.Entry<Long, Team> entry : teams.entrySet()) {
 
-            List<Fixture> recentFixtures = fixtureRepository.findRecentCompletedFixturesForTeam(
-                    teamId,
-                    OffsetDateTime.now(),
-                    PageRequest.of(0, safeLimit)
-            );
+            Team targetTeam = entry.getValue();
 
-            FormAccumulator acc = new FormAccumulator(teamId, teamName);
+            Long teamId = targetTeam.getId();
+            String teamName = targetTeam.getTeamName();
+
+            List<Fixture> recentFixtures =
+                    fixtureRepository.findRecentCompletedFixturesForTeam(
+                            targetTeam.getProviderName(),
+                            targetTeam.getExternalTeamId(),
+                            OffsetDateTime.now(),
+                            PageRequest.of(0, safeLimit)
+                    );
+
+            FormAccumulator acc =
+                    new FormAccumulator(teamId, teamName);
 
             for (Fixture fixture : recentFixtures) {
-                int teamGoals = teamGoals(teamId, fixture);
-                int opponentGoals = opponentGoals(teamId, fixture);
+            	int teamGoals =
+            	        teamGoals(targetTeam, fixture);
+
+            	int opponentGoals =
+            	        opponentGoals(targetTeam, fixture);
 
                 acc.played++;
                 acc.goalsFor += teamGoals;
@@ -193,14 +209,48 @@ public class AppFormTableService {
         );
     }
 
-    private int teamGoals(Long teamId, Fixture fixture) {
-        boolean isHome = fixture.getHomeTeam().getId().equals(teamId);
-        return isHome ? safeInt(fixture.getHomeGoals()) : safeInt(fixture.getAwayGoals());
+    private int teamGoals(
+            Team targetTeam,
+            Fixture fixture) {
+
+        boolean isHome = sameTeam(
+                targetTeam,
+                fixture.getHomeTeam()
+        );
+
+        return isHome
+                ? safeInt(fixture.getHomeGoals())
+                : safeInt(fixture.getAwayGoals());
     }
 
-    private int opponentGoals(Long teamId, Fixture fixture) {
-        boolean isHome = fixture.getHomeTeam().getId().equals(teamId);
-        return isHome ? safeInt(fixture.getAwayGoals()) : safeInt(fixture.getHomeGoals());
+    private int opponentGoals(
+            Team targetTeam,
+            Fixture fixture) {
+
+        boolean isHome = sameTeam(
+                targetTeam,
+                fixture.getHomeTeam()
+        );
+
+        return isHome
+                ? safeInt(fixture.getAwayGoals())
+                : safeInt(fixture.getHomeGoals());
+    }
+    
+    private boolean sameTeam(
+            Team first,
+            Team second) {
+
+        return first != null
+                && second != null
+                && Objects.equals(
+                        first.getProviderName(),
+                        second.getProviderName()
+                )
+                && Objects.equals(
+                        first.getExternalTeamId(),
+                        second.getExternalTeamId()
+                );
     }
 
     private int safeInt(Integer value) {

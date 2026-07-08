@@ -1,6 +1,8 @@
 package ro.betrio.backend.service.analysis;
 
 import java.time.OffsetDateTime;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 import java.util.List;
 
@@ -16,7 +18,8 @@ import ro.betrio.backend.repository.FixtureAbsenceRepository;
 import ro.betrio.backend.repository.FixtureRepository;
 import ro.betrio.backend.repository.FixtureTeamStatRepository;
 import org.springframework.transaction.annotation.Transactional;
-
+import java.util.Objects;
+import ro.betrio.backend.domain.entity.Team;
 @Service
 public class FeatureBuilderService {
 
@@ -44,9 +47,17 @@ public class FeatureBuilderService {
 
         OffsetDateTime before = fixture.getKickoffAt();
 
-        TeamFormSnapshotDto homeForm = buildTeamForm(fixture.getHomeTeam().getId(), fixtureId, before);
-        TeamFormSnapshotDto awayForm = buildTeamForm(fixture.getAwayTeam().getId(), fixtureId, before);
-        HeadToHeadSnapshotDto h2h = buildHeadToHead(fixture.getHomeTeam().getId(), fixture.getAwayTeam().getId(), before);
+        Team homeTeam = fixture.getHomeTeam();
+        Team awayTeam = fixture.getAwayTeam();
+
+        TeamFormSnapshotDto homeForm =
+                buildTeamForm(homeTeam, fixtureId, before);
+
+        TeamFormSnapshotDto awayForm =
+                buildTeamForm(awayTeam, fixtureId, before);
+
+        HeadToHeadSnapshotDto h2h =
+                buildHeadToHead(homeTeam, awayTeam, before);
 
         double expectedHomeGoals = expectedGoals(homeForm, awayForm, h2h, true);
         double expectedAwayGoals = expectedGoals(awayForm, homeForm, h2h, false);
@@ -64,8 +75,27 @@ public class FeatureBuilderService {
         );
     }
 
-    private TeamFormSnapshotDto buildTeamForm(Long teamId, Long fixtureId, OffsetDateTime before) {
-        List<Fixture> fixtures = fixtureRepository.findRecentCompletedFixturesForTeam(teamId, before, PageRequest.of(0, 5));
+    private TeamFormSnapshotDto buildTeamForm(
+            Team targetTeam,
+            Long fixtureId,
+            OffsetDateTime before) {
+
+        String providerName = targetTeam.getProviderName();
+        Long externalTeamId = targetTeam.getExternalTeamId();
+
+        List<Fixture> fixtures =
+                fixtureRepository.findRecentCompletedFixturesForTeam(
+                        providerName,
+                        externalTeamId,
+                        before,
+                        PageRequest.of(0, 5)
+                );
+        Map<Long, List<FixtureTeamStat>> statsByFixtureId =
+                loadStatsByFixture(
+                        fixtures,
+                        targetTeam.getProviderName(),
+                        targetTeam.getExternalTeamId()
+                );
 
         int wins = 0;
         int draws = 0;
@@ -86,10 +116,24 @@ public class FeatureBuilderService {
         int shotsOnGoalCount = 0;
 
         for (Fixture f : fixtures) {
-            boolean isHome = f.getHomeTeam() != null && teamId.equals(f.getHomeTeam().getId());
 
-            int gf = safeInt(isHome ? f.getHomeGoals() : f.getAwayGoals());
-            int ga = safeInt(isHome ? f.getAwayGoals() : f.getHomeGoals());
+            boolean isHome = sameTeam(
+                    f.getHomeTeam(),
+                    providerName,
+                    externalTeamId
+            );
+
+            int gf = safeInt(
+                    isHome
+                            ? f.getHomeGoals()
+                            : f.getAwayGoals()
+            );
+
+            int ga = safeInt(
+                    isHome
+                            ? f.getAwayGoals()
+                            : f.getHomeGoals()
+            );
 
             goalsFor += gf;
             goalsAgainst += ga;
@@ -107,36 +151,56 @@ public class FeatureBuilderService {
             if (gf > 0 && ga > 0) {
                 bttsMatches++;
             }
-            if ((gf + ga) > 2) {
+
+            if (gf + ga > 2) {
                 over25Matches++;
             }
+
             if (ga == 0) {
                 cleanSheets++;
             }
 
-            List<FixtureTeamStat> stats = fixtureTeamStatRepository.findByFixtureIdAndTeamId(f.getId(), teamId);
-            Double possession = getNumericStat(stats, "Ball Possession");
+            /*
+             * Aici folosim ID-ul echipei din sezonul
+             * în care s-a jucat meciul istoric.
+             */
+            List<FixtureTeamStat> stats =
+                    statsByFixtureId.getOrDefault(
+                            f.getId(),
+                            List.of()
+                    );
+
+            Double possession =
+                    getNumericStat(stats, "Ball Possession");
+
             if (possession != null) {
                 possessionSum += possession;
                 possessionCount++;
             }
 
-            Double shotsOnGoal = getNumericStat(stats, "Shots on Goal");
+            Double shotsOnGoal =
+                    getNumericStat(stats, "Shots on Goal");
+
             if (shotsOnGoal != null) {
                 shotsOnGoalSum += shotsOnGoal;
                 shotsOnGoalCount++;
             }
         }
 
-        long absences = fixtureAbsenceRepository.countByFixtureIdAndTeamId(fixtureId, teamId);
+        /*
+         * Aici folosim ID-ul echipei din sezonul actual,
+         * deoarece absențele aparțin fixture-ului analizat.
+         */
+        long absences =
+                fixtureAbsenceRepository
+                        .countByFixtureIdAndTeamId(
+                                fixtureId,
+                                targetTeam.getId()
+                        );
 
         return new TeamFormSnapshotDto(
-                teamId,
-                fixtures.isEmpty()
-                        ? "Unknown"
-                        : (fixtures.getFirst().getHomeTeam().getId().equals(teamId)
-                                ? fixtures.getFirst().getHomeTeam().getTeamName()
-                                : fixtures.getFirst().getAwayTeam().getTeamName()),
+                targetTeam.getId(),
+                targetTeam.getTeamName(),
                 sample,
                 wins,
                 draws,
@@ -154,13 +218,37 @@ public class FeatureBuilderService {
         );
     }
 
-    private HeadToHeadSnapshotDto buildHeadToHead(Long homeTeamId, Long awayTeamId, OffsetDateTime before) {
-        List<Fixture> fixtures = fixtureRepository.findRecentHeadToHead(
-                homeTeamId,
-                awayTeamId,
-                before,
-                PageRequest.of(0, 5)
-        );
+    private HeadToHeadSnapshotDto buildHeadToHead(
+            Team requestedHomeTeam,
+            Team requestedAwayTeam,
+            OffsetDateTime before) {
+
+        String providerName =
+                requestedHomeTeam.getProviderName();
+
+        if (!Objects.equals(
+                providerName,
+                requestedAwayTeam.getProviderName())) {
+
+            throw new IllegalStateException(
+                    "The two teams use different providers."
+            );
+        }
+
+        Long homeExternalTeamId =
+                requestedHomeTeam.getExternalTeamId();
+
+        Long awayExternalTeamId =
+                requestedAwayTeam.getExternalTeamId();
+
+        List<Fixture> fixtures =
+                fixtureRepository.findRecentHeadToHead(
+                        providerName,
+                        homeExternalTeamId,
+                        awayExternalTeamId,
+                        before,
+                        PageRequest.of(0, 5)
+                );
 
         int homeWins = 0;
         int draws = 0;
@@ -171,13 +259,40 @@ public class FeatureBuilderService {
         double awayPoints = 0;
 
         for (Fixture f : fixtures) {
-            int homeGoals = safeInt(f.getHomeGoals());
-            int awayGoals = safeInt(f.getAwayGoals());
 
-            boolean requestedHomeWasActualHome = homeTeamId.equals(f.getHomeTeam().getId());
+            int actualHomeGoals =
+                    safeInt(f.getHomeGoals());
 
-            int requestedHomeGoals = requestedHomeWasActualHome ? homeGoals : awayGoals;
-            int requestedAwayGoals = requestedHomeWasActualHome ? awayGoals : homeGoals;
+            int actualAwayGoals =
+                    safeInt(f.getAwayGoals());
+
+            /*
+             * Verificăm dacă echipa care este gazdă
+             * în meciul analizat a fost gazdă și în
+             * meciul istoric.
+             */
+            boolean requestedHomeWasActualHome =
+                    sameTeam(
+                            f.getHomeTeam(),
+                            providerName,
+                            homeExternalTeamId
+                    );
+
+            int requestedHomeGoals;
+
+            int requestedAwayGoals;
+
+            if (requestedHomeWasActualHome) {
+                requestedHomeGoals = actualHomeGoals;
+                requestedAwayGoals = actualAwayGoals;
+            } else {
+                /*
+                 * În meciul istoric echipele au jucat
+                 * cu pozițiile inversate.
+                 */
+                requestedHomeGoals = actualAwayGoals;
+                requestedAwayGoals = actualHomeGoals;
+            }
 
             if (requestedHomeGoals > requestedAwayGoals) {
                 homeWins++;
@@ -225,6 +340,59 @@ public class FeatureBuilderService {
 
         return clamp(lambda, 0.20, 3.50);
     }
+    
+    private Map<Long, List<FixtureTeamStat>>
+    loadStatsByFixture(
+            List<Fixture> fixtures,
+            String providerName,
+            Long externalTeamId) {
+
+if (fixtures.isEmpty()) {
+    return Map.of();
+}
+
+List<Long> fixtureIds = fixtures.stream()
+        .map(Fixture::getId)
+        .toList();
+
+List<Long> historicalTeamIds = fixtures.stream()
+        .map(fixture -> {
+
+            if (sameTeam(
+                    fixture.getHomeTeam(),
+                    providerName,
+                    externalTeamId)) {
+
+                return fixture.getHomeTeam();
+            }
+
+            return fixture.getAwayTeam();
+        })
+        .filter(Objects::nonNull)
+        .map(Team::getId)
+        .distinct()
+        .toList();
+
+if (historicalTeamIds.isEmpty()) {
+    return Map.of();
+}
+
+List<FixtureTeamStat> allStats =
+        fixtureTeamStatRepository
+                .findByFixtureIdInAndTeamIdIn(
+                        fixtureIds,
+                        historicalTeamIds
+                );
+
+return allStats.stream()
+        .collect(
+                Collectors.groupingBy(
+                        stat -> stat
+                                .getFixture()
+                                .getId()
+                )
+        );
+}
 
     private Double getNumericStat(List<FixtureTeamStat> stats, String name) {
         return stats.stream()
@@ -245,5 +413,20 @@ public class FeatureBuilderService {
 
     private double clamp(double value, double min, double max) {
         return Math.max(min, Math.min(max, value));
+    }
+    private boolean sameTeam(
+            Team team,
+            String providerName,
+            Long externalTeamId) {
+
+        return team != null
+                && Objects.equals(
+                        team.getProviderName(),
+                        providerName
+                )
+                && Objects.equals(
+                        team.getExternalTeamId(),
+                        externalTeamId
+                );
     }
 }

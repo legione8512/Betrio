@@ -1,6 +1,7 @@
 package ro.betrio.backend.service.app;
+import java.util.Objects;
 
-import java.time.OffsetDateTime;
+import ro.betrio.backend.domain.entity.Team;
 import java.util.List;
 
 import org.springframework.data.domain.PageRequest;
@@ -25,18 +26,42 @@ public class AppH2HService {
         Fixture fixture = fixtureRepository.findDetailedById(fixtureId)
                 .orElseThrow(() -> new IllegalStateException("Fixture not found: " + fixtureId));
 
-        Long homeTeamId = fixture.getHomeTeam().getId();
-        Long awayTeamId = fixture.getAwayTeam().getId();
+        Team currentHomeTeam = fixture.getHomeTeam();
+        Team currentAwayTeam = fixture.getAwayTeam();
 
-        List<Fixture> h2hFixtures = fixtureRepository.findRecentHeadToHead(
-                homeTeamId,
-                awayTeamId,
-                fixture.getKickoffAt(),
-                PageRequest.of(0, limit)
-        );
+        if (currentHomeTeam == null || currentAwayTeam == null) {
+            throw new IllegalStateException(
+                    "Fixture is missing home or away team."
+            );
+        }
 
-        FixtureH2HDto.Summary summary = buildSummary(homeTeamId, awayTeamId, h2hFixtures);
+        if (!Objects.equals(
+                currentHomeTeam.getProviderName(),
+                currentAwayTeam.getProviderName())) {
 
+            throw new IllegalStateException(
+                    "The two teams use different providers."
+            );
+        }
+
+        Long homeTeamId = currentHomeTeam.getId();
+        Long awayTeamId = currentAwayTeam.getId();
+
+        List<Fixture> h2hFixtures =
+                fixtureRepository.findRecentHeadToHead(
+                        currentHomeTeam.getProviderName(),
+                        currentHomeTeam.getExternalTeamId(),
+                        currentAwayTeam.getExternalTeamId(),
+                        fixture.getKickoffAt(),
+                        PageRequest.of(0, limit)
+                );
+
+        FixtureH2HDto.Summary summary =
+                buildSummary(
+                        currentHomeTeam,
+                        h2hFixtures
+                );
+        
         List<FixtureH2HDto.H2HMatchItem> items = h2hFixtures.stream()
                 .map(this::toMatchItem)
                 .toList();
@@ -52,7 +77,10 @@ public class AppH2HService {
         );
     }
 
-    private FixtureH2HDto.Summary buildSummary(Long currentHomeTeamId, Long currentAwayTeamId, List<Fixture> fixtures) {
+    private FixtureH2HDto.Summary buildSummary(
+            Team currentHomeTeam,
+            List<Fixture> fixtures) {
+
         int homeTeamWins = 0;
         int draws = 0;
         int awayTeamWins = 0;
@@ -60,23 +88,35 @@ public class AppH2HService {
         int awayTeamGoals = 0;
 
         for (Fixture fixture : fixtures) {
-            boolean currentHomeWasHome = fixture.getHomeTeam().getId().equals(currentHomeTeamId);
 
-            int currentHomeGoalsInThatMatch = currentHomeWasHome
-                    ? safeInt(fixture.getHomeGoals())
-                    : safeInt(fixture.getAwayGoals());
+            boolean currentHomeWasHome = sameTeam(
+                    currentHomeTeam,
+                    fixture.getHomeTeam()
+            );
 
-            int currentAwayGoalsInThatMatch = currentHomeWasHome
-                    ? safeInt(fixture.getAwayGoals())
-                    : safeInt(fixture.getHomeGoals());
+            int currentHomeGoalsInThatMatch =
+                    currentHomeWasHome
+                            ? safeInt(fixture.getHomeGoals())
+                            : safeInt(fixture.getAwayGoals());
+
+            int currentAwayGoalsInThatMatch =
+                    currentHomeWasHome
+                            ? safeInt(fixture.getAwayGoals())
+                            : safeInt(fixture.getHomeGoals());
 
             homeTeamGoals += currentHomeGoalsInThatMatch;
             awayTeamGoals += currentAwayGoalsInThatMatch;
 
-            if (currentHomeGoalsInThatMatch > currentAwayGoalsInThatMatch) {
+            if (currentHomeGoalsInThatMatch
+                    > currentAwayGoalsInThatMatch) {
+
                 homeTeamWins++;
-            } else if (currentHomeGoalsInThatMatch < currentAwayGoalsInThatMatch) {
+
+            } else if (currentHomeGoalsInThatMatch
+                    < currentAwayGoalsInThatMatch) {
+
                 awayTeamWins++;
+
             } else {
                 draws++;
             }
@@ -118,6 +158,22 @@ public class AppH2HService {
         );
     }
 
+    private boolean sameTeam(
+            Team first,
+            Team second) {
+
+        return first != null
+                && second != null
+                && Objects.equals(
+                        first.getProviderName(),
+                        second.getProviderName()
+                )
+                && Objects.equals(
+                        first.getExternalTeamId(),
+                        second.getExternalTeamId()
+                );
+    }
+    
     private int safeInt(Integer value) {
         return value == null ? 0 : value;
     }

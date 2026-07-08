@@ -2,6 +2,10 @@ import React, { useState } from "react";
 import { getJson } from "../api/http.js";
 import { ErrorBlock, JsonBox, LoadingBlock, Metric, SectionCard } from "../components/ui.jsx";
 import { useAsync } from "../components/hooks.js";
+import {
+  formatDecimal,
+  formatProbability,
+} from "../utils/formatters.js";
 
 export function ReportsPage({ competition }) {
   const [fixtureId, setFixtureId] = useState("310");
@@ -48,11 +52,26 @@ export function ReportsPage({ competition }) {
         <SectionCard title="Model dashboard" subtitle="GET /api/reports/dashboard">
           <div className="metrics-grid three">
             <Metric label="Evaluated" value={dashboard.data.totalEvaluatedPredictions} />
-            <Metric label="1X2 accuracy" value={dashboard.data.accuracy1x2} />
-            <Metric label="Over 2.5" value={dashboard.data.accuracyOver25} />
-            <Metric label="BTTS" value={dashboard.data.accuracyBtts} />
-            <Metric label="Avg Brier" value={dashboard.data.averageBrierScore1x2} />
-            <Metric label="Avg Log Loss" value={dashboard.data.averageLogLoss1x2} />
+            <Metric
+  label="1X2 accuracy"
+  value={formatProbability(dashboard.data.accuracy1x2)}
+/>
+<Metric
+  label="Over 2.5"
+  value={formatProbability(dashboard.data.accuracyOver25)}
+/>
+<Metric
+  label="BTTS"
+  value={formatProbability(dashboard.data.accuracyBtts)}
+/>
+<Metric
+  label="Avg Brier"
+  value={formatDecimal(dashboard.data.averageBrierScore1x2)}
+/>
+<Metric
+  label="Avg Log Loss"
+  value={formatDecimal(dashboard.data.averageLogLoss1x2)}
+/>
           </div>
         </SectionCard>
       ) : null}

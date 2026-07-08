@@ -47,8 +47,8 @@ public class PredictionPersistenceService {
                 .orElseThrow(() -> new IllegalStateException("Fixture not found: " + fixtureId));
 
         MatchFeatureSnapshotDto features = featureBuilderService.buildForFixture(fixtureId);
-        MatchPredictionDto prediction = probabilityEngineService.predictForFixture(fixtureId);
-
+        MatchPredictionDto prediction =
+                probabilityEngineService.predict(features);
         PredictionRun run = new PredictionRun();
         run.setFixture(fixture);
         run.setModelVersion(MODEL_VERSION);

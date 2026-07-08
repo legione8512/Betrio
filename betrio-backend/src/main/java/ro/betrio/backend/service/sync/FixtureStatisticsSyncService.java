@@ -70,7 +70,7 @@ public class FixtureStatisticsSyncService {
                 stat.setFixture(fixture);
                 stat.setTeam(team);
                 stat.setStatName(statName);
-                stat.setStatValueText(valueNode.isMissingNode() || valueNode.isNull() ? null : valueNode.asText());
+                stat.setStatValueText(valueNode.isMissingNode() || valueNode.isNull() ? null : valueNode.asString());
                 stat.setStatValueNumber(parseNumericStat(valueNode));
 
                 fixtureTeamStatRepository.save(stat);
@@ -105,7 +105,7 @@ public class FixtureStatisticsSyncService {
 
     private String textOrNull(JsonNode node, String field) {
         JsonNode value = node.path(field);
-        return value.isMissingNode() || value.isNull() ? null : value.asText();
+        return value.isMissingNode() || value.isNull() ? null : value.asString();
     }
 
     private Long longOrNull(JsonNode node, String field) {
@@ -122,7 +122,7 @@ public class FixtureStatisticsSyncService {
             return valueNode.asDouble();
         }
 
-        String raw = valueNode.asText();
+        String raw = valueNode.asString();
         if (raw == null || raw.isBlank()) {
             return null;
         }

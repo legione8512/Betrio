@@ -31,6 +31,9 @@ public class AnalysisController {
 
     @GetMapping("/predictions/fixture/{fixtureId}")
     public MatchPredictionDto getPrediction(@PathVariable Long fixtureId) {
-        return probabilityEngineService.predictForFixture(fixtureId);
-    }
+    	MatchFeatureSnapshotDto features =
+    	        featureBuilderService
+    	                .buildForFixture(fixtureId);
+
+    	return probabilityEngineService.predict(features);    }
 }

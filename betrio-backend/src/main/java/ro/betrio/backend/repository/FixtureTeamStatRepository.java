@@ -1,5 +1,6 @@
 package ro.betrio.backend.repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -16,4 +17,8 @@ public interface FixtureTeamStatRepository extends JpaRepository<FixtureTeamStat
     List<FixtureTeamStat> findByFixtureIdAndTeamId(Long fixtureId, Long teamId);
 
     Optional<FixtureTeamStat> findByFixtureIdAndTeamIdAndStatName(Long fixtureId, Long teamId, String statName);
+    List<FixtureTeamStat> findByFixtureIdInAndTeamIdIn(
+            Collection<Long> fixtureIds,
+            Collection<Long> teamIds
+    );
 }

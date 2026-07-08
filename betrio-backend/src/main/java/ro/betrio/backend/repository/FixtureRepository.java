@@ -29,13 +29,20 @@ public interface FixtureRepository extends JpaRepository<Fixture, Long>, org.spr
     @Query("""
             select f
             from Fixture f
-            where (f.homeTeam.id = :teamId or f.awayTeam.id = :teamId)
+            join fetch f.homeTeam ht
+            join fetch f.awayTeam at
+            where (
+                    (ht.providerName = :providerName and ht.externalTeamId = :externalTeamId)
+                    or
+                    (at.providerName = :providerName and at.externalTeamId = :externalTeamId)
+                  )
               and f.kickoffAt < :before
               and f.statusShort in ('FT', 'AET', 'PEN')
             order by f.kickoffAt desc
             """)
     List<Fixture> findRecentCompletedFixturesForTeam(
-            @Param("teamId") Long teamId,
+            @Param("providerName") String providerName,
+            @Param("externalTeamId") Long externalTeamId,
             @Param("before") OffsetDateTime before,
             Pageable pageable
     );
@@ -43,18 +50,31 @@ public interface FixtureRepository extends JpaRepository<Fixture, Long>, org.spr
     @Query("""
             select f
             from Fixture f
+            join fetch f.homeTeam ht
+            join fetch f.awayTeam at
             where (
-                    (f.homeTeam.id = :homeTeamId and f.awayTeam.id = :awayTeamId)
+                    (
+                        ht.providerName = :providerName
+                        and ht.externalTeamId = :homeExternalTeamId
+                        and at.providerName = :providerName
+                        and at.externalTeamId = :awayExternalTeamId
+                    )
                     or
-                    (f.homeTeam.id = :awayTeamId and f.awayTeam.id = :homeTeamId)
+                    (
+                        ht.providerName = :providerName
+                        and ht.externalTeamId = :awayExternalTeamId
+                        and at.providerName = :providerName
+                        and at.externalTeamId = :homeExternalTeamId
+                    )
                   )
               and f.kickoffAt < :before
               and f.statusShort in ('FT', 'AET', 'PEN')
             order by f.kickoffAt desc
             """)
     List<Fixture> findRecentHeadToHead(
-            @Param("homeTeamId") Long homeTeamId,
-            @Param("awayTeamId") Long awayTeamId,
+            @Param("providerName") String providerName,
+            @Param("homeExternalTeamId") Long homeExternalTeamId,
+            @Param("awayExternalTeamId") Long awayExternalTeamId,
             @Param("before") OffsetDateTime before,
             Pageable pageable
     );

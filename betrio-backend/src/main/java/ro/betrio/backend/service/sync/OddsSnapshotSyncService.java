@@ -82,7 +82,7 @@ public class OddsSnapshotSyncService {
 
     private String textOrNull(JsonNode node, String field) {
         JsonNode value = node.path(field);
-        return value.isMissingNode() || value.isNull() ? null : value.asText();
+        return value.isMissingNode() || value.isNull() ? null : value.asString();
     }
 
     private Long longOrNull(JsonNode node, String field) {
@@ -96,7 +96,7 @@ public class OddsSnapshotSyncService {
             return null;
         }
         try {
-            return Double.parseDouble(value.asText());
+            return Double.parseDouble(value.asString());
         } catch (NumberFormatException ex) {
             return null;
         }
