@@ -1,6 +1,9 @@
 package ro.betrio.backend.service.report;
 
 import java.util.List;
+import ro.betrio.backend.api.dto.report.ModelVersionPerformanceDto;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -44,12 +47,20 @@ public class ReportingService {
                 .map(this::toRecentEvaluationDto)
                 .toList();
     }
+    
+    @Transactional(readOnly = true)
+    public List<ModelVersionPerformanceDto> getModelVersionPerformance() {
+        return predictionEvaluationRepository.findModelVersionPerformance();
+    }
 
     @Transactional(readOnly = true)
     public FixtureEvaluationReportDto getFixtureReport(Long fixtureId) {
-        PredictionEvaluation evaluation = predictionEvaluationRepository.findDetailedByFixtureId(fixtureId)
-                .orElseThrow(() -> new IllegalStateException("No evaluation found for fixture id: " + fixtureId));
-
+    	PredictionEvaluation evaluation = predictionEvaluationRepository.findDetailedByFixtureId(fixtureId)
+    	        .orElseThrow(() -> new ResponseStatusException(
+    	                HttpStatus.NOT_FOUND,
+    	                "No evaluation found for fixture id: " + fixtureId
+    	        ));
+    	
         Fixture fixture = evaluation.getPredictionRun().getFixture();
 
         return new FixtureEvaluationReportDto(
@@ -75,7 +86,10 @@ public class ReportingService {
         List<PredictionEvaluation> evaluations = predictionEvaluationRepository.findByTeamId(teamId);
 
         if (evaluations.isEmpty()) {
-            throw new IllegalStateException("No evaluated matches found for team id: " + teamId);
+        	throw new ResponseStatusException(
+        	        HttpStatus.NOT_FOUND,
+        	        "No evaluated matches found for team id: " + teamId
+        	);
         }
 
         String teamName = extractTeamName(teamId, evaluations.getFirst().getPredictionRun().getFixture());

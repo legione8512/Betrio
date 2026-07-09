@@ -15,9 +15,6 @@ public class PredictionRun {
     @JoinColumn(name = "fixture_id", nullable = false)
     private Fixture fixture;
 
-    @Column(name = "model_version", nullable = false, length = 50)
-    private String modelVersion;
-
     @Column(name = "generated_at", nullable = false, insertable = false, updatable = false)
     private OffsetDateTime generatedAt;
 
@@ -47,12 +44,13 @@ public class PredictionRun {
 
     @Column(name = "btts_no_probability", nullable = false)
     private Double bttsNoProbability;
+    
+    @Column(name = "model_version", nullable = false, length = 50)
+    private String modelVersion = "poisson-v1";
 
     public Long getId() { return id; }
     public Fixture getFixture() { return fixture; }
     public void setFixture(Fixture fixture) { this.fixture = fixture; }
-    public String getModelVersion() { return modelVersion; }
-    public void setModelVersion(String modelVersion) { this.modelVersion = modelVersion; }
     public OffsetDateTime getGeneratedAt() { return generatedAt; }
     public Double getExpectedHomeGoals() { return expectedHomeGoals; }
     public void setExpectedHomeGoals(Double expectedHomeGoals) { this.expectedHomeGoals = expectedHomeGoals; }
@@ -72,4 +70,11 @@ public class PredictionRun {
     public void setBttsYesProbability(Double bttsYesProbability) { this.bttsYesProbability = bttsYesProbability; }
     public Double getBttsNoProbability() { return bttsNoProbability; }
     public void setBttsNoProbability(Double bttsNoProbability) { this.bttsNoProbability = bttsNoProbability; }
+    public String getModelVersion() {
+        return modelVersion;
+    }
+
+    public void setModelVersion(String modelVersion) {
+        this.modelVersion = modelVersion;
+    }
 }

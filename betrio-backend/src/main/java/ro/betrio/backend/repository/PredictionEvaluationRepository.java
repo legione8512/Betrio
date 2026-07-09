@@ -1,6 +1,7 @@
 package ro.betrio.backend.repository;
 
 import java.util.List;
+import ro.betrio.backend.api.dto.report.ModelVersionPerformanceDto;
 import java.util.Optional;
 
 import org.springframework.data.domain.Pageable;
@@ -98,4 +99,22 @@ public interface PredictionEvaluationRepository extends JpaRepository<Prediction
             order by pe.evaluatedAt desc
             """)
     List<PredictionEvaluation> findRecentWithFixture(Pageable pageable);
+    
+    @Query("""
+            select new ro.betrio.backend.api.dto.report.ModelVersionPerformanceDto(
+                coalesce(pr.modelVersion, 'unknown'),
+                count(e),
+                coalesce(avg(case when e.hit1x2 = true then 1.0 else 0.0 end), 0.0),
+                coalesce(avg(case when e.hitOver25 = true then 1.0 else 0.0 end), 0.0),
+                coalesce(avg(case when e.hitBtts = true then 1.0 else 0.0 end), 0.0),
+                coalesce(avg(case when e.topExactScoreHit = true then 1.0 else 0.0 end), 0.0),
+                coalesce(avg(e.brierScore1x2), 0.0),
+                coalesce(avg(e.logLoss1x2), 0.0)
+            )
+            from PredictionEvaluation e
+            join e.predictionRun pr
+            group by coalesce(pr.modelVersion, 'unknown')
+            order by count(e) desc
+            """)
+    List<ModelVersionPerformanceDto> findModelVersionPerformance();
 }

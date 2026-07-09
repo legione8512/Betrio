@@ -16,6 +16,9 @@ public record TeamFormSnapshotDto(
         double cleanSheetRate,
         double avgPossession,
         double avgShotsOnGoal,
-        long knownAbsencesForFixture
+        long knownAbsencesForFixture,
+        long missingFixtureAbsences,
+        long questionableAbsences,
+        double absenceImpactScore
 ) {
 }

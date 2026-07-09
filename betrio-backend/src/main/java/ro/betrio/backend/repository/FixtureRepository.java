@@ -46,6 +46,42 @@ public interface FixtureRepository extends JpaRepository<Fixture, Long>, org.spr
             @Param("before") OffsetDateTime before,
             Pageable pageable
     );
+    
+    @Query("""
+            select f
+            from Fixture f
+            join fetch f.homeTeam ht
+            join fetch f.awayTeam at
+            where ht.providerName = :providerName
+              and ht.externalTeamId = :externalTeamId
+              and f.kickoffAt < :before
+              and f.statusShort in ('FT', 'AET', 'PEN')
+            order by f.kickoffAt desc
+            """)
+    List<Fixture> findRecentCompletedHomeFixturesForTeam(
+            @Param("providerName") String providerName,
+            @Param("externalTeamId") Long externalTeamId,
+            @Param("before") OffsetDateTime before,
+            Pageable pageable
+    );
+
+    @Query("""
+            select f
+            from Fixture f
+            join fetch f.homeTeam ht
+            join fetch f.awayTeam at
+            where at.providerName = :providerName
+              and at.externalTeamId = :externalTeamId
+              and f.kickoffAt < :before
+              and f.statusShort in ('FT', 'AET', 'PEN')
+            order by f.kickoffAt desc
+            """)
+    List<Fixture> findRecentCompletedAwayFixturesForTeam(
+            @Param("providerName") String providerName,
+            @Param("externalTeamId") Long externalTeamId,
+            @Param("before") OffsetDateTime before,
+            Pageable pageable
+    );
 
     @Query("""
             select f
@@ -277,5 +313,20 @@ public interface FixtureRepository extends JpaRepository<Fixture, Long>, org.spr
             """)
     List<String> findDistinctRoundsByCompetition(
             @Param("competitionId") Long competitionId
+    );
+    @Query("""
+            select f
+            from Fixture f
+            join fetch f.homeTeam
+            join fetch f.awayTeam
+            where f.season.competition.id = :competitionId
+              and f.kickoffAt < :before
+              and f.statusShort in ('FT', 'AET', 'PEN')
+            order by f.kickoffAt desc
+            """)
+    List<Fixture> findCompletedFixturesForCompetitionBefore(
+            @Param("competitionId") Long competitionId,
+            @Param("before") OffsetDateTime before,
+            Pageable pageable
     );
 }

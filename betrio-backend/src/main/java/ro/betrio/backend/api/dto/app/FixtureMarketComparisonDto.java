@@ -11,7 +11,8 @@ public record FixtureMarketComparisonDto(
         MarketOdds market,
         EdgeSummary edges,
         String bestEdgeSelection,
-        OffsetDateTime oddsCapturedAt
+        OffsetDateTime oddsCapturedAt,
+        OddsMovement oddsMovement
 ) {
     public record ModelProbabilities(
             Double homeWinProbability,
@@ -37,6 +38,31 @@ public record FixtureMarketComparisonDto(
             Double homeEdge,
             Double drawEdge,
             Double awayEdge
+    ) {
+    }
+    public record OddsMovement(
+            boolean available,
+            String firstCapturedAt,
+            String latestCapturedAt,
+            SelectionMovement home,
+            SelectionMovement draw,
+            SelectionMovement away,
+            String strongestMoveSelection,
+            String strongestMoveDirection,
+            Double strongestProbabilityDelta,
+            String summary
+    ) {
+    }
+
+    public record SelectionMovement(
+            String selection,
+            Double firstOdd,
+            Double latestOdd,
+            Double oddDelta,
+            Double firstImpliedProbability,
+            Double latestImpliedProbability,
+            Double impliedProbabilityDelta,
+            String direction
     ) {
     }
 }

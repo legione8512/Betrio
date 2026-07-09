@@ -20,7 +20,7 @@ import ro.betrio.backend.service.analysis.FeatureBuilderService;
 @Service
 public class PredictionPersistenceService {
 
-    private static final String MODEL_VERSION = "v1-baseline-poisson";
+    private static final String MODEL_VERSION = "poisson-v2-context";
 
     private final FixtureRepository fixtureRepository;
     private final FeatureBuilderService featureBuilderService;

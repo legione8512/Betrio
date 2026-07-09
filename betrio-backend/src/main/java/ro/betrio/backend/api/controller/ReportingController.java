@@ -1,6 +1,7 @@
 package ro.betrio.backend.api.controller;
 
 import java.util.List;
+import ro.betrio.backend.api.dto.report.ModelVersionPerformanceDto;
 
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -33,6 +34,11 @@ public class ReportingController {
     public List<RecentEvaluationDto> getRecent(
             @RequestParam(defaultValue = "10") int limit) {
         return reportingService.getRecentEvaluations(limit);
+    }
+    
+    @GetMapping("/model-versions")
+    public List<ModelVersionPerformanceDto> getModelVersionPerformance() {
+        return reportingService.getModelVersionPerformance();
     }
 
     @GetMapping("/fixture/{fixtureId}")

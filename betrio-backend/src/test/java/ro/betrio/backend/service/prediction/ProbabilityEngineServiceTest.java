@@ -59,6 +59,13 @@ class ProbabilityEngineServiceTest {
                 null,
                 null,
                 null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
                 expectedHomeGoals,
                 expectedAwayGoals
         );

@@ -1,6 +1,9 @@
 package ro.betrio.backend.service.app;
 
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -10,6 +13,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import ro.betrio.backend.api.dto.app.FixtureMarketComparisonDto;
+import ro.betrio.backend.api.dto.app.FixtureMarketComparisonDto.EdgeSummary;
+import ro.betrio.backend.api.dto.app.FixtureMarketComparisonDto.MarketOdds;
+import ro.betrio.backend.api.dto.app.FixtureMarketComparisonDto.ModelProbabilities;
+import ro.betrio.backend.api.dto.app.FixtureMarketComparisonDto.OddsMovement;
+import ro.betrio.backend.api.dto.app.FixtureMarketComparisonDto.SelectionMovement;
 import ro.betrio.backend.domain.entity.Fixture;
 import ro.betrio.backend.domain.entity.OddsSnapshot;
 import ro.betrio.backend.domain.entity.PredictionRun;
@@ -64,30 +72,41 @@ public class MarketComparisonService {
             PredictionRun latestPrediction,
             List<OddsSnapshot> allSnapshots) {
 
-        if (allSnapshots.isEmpty()) {
+        List<OddsSnapshot> safeSnapshots =
+                allSnapshots == null ? List.of() : allSnapshots;
+
+        OddsMovement oddsMovement =
+                buildOddsMovement(fixture, safeSnapshots);
+
+        ModelProbabilities modelProbabilities =
+                new ModelProbabilities(
+                        latestPrediction.getHomeWinProbability(),
+                        latestPrediction.getDrawProbability(),
+                        latestPrediction.getAwayWinProbability()
+                );
+
+        if (safeSnapshots.isEmpty()) {
             return new FixtureMarketComparisonDto(
                     fixture.getId(),
                     fixture.getHomeTeam().getTeamName(),
                     fixture.getAwayTeam().getTeamName(),
                     fixture.getKickoffAt(),
-                    new FixtureMarketComparisonDto.ModelProbabilities(
-                            latestPrediction.getHomeWinProbability(),
-                            latestPrediction.getDrawProbability(),
-                            latestPrediction.getAwayWinProbability()
-                    ),
+                    modelProbabilities,
                     null,
                     null,
                     null,
-                    null
+                    null,
+                    oddsMovement
             );
         }
 
         OffsetDateTime latestCapturedAt =
-                allSnapshots.get(0).getCapturedAt();
+                safeSnapshots.get(0).getCapturedAt();
 
-        List<OddsSnapshot> latestBatch = allSnapshots.stream()
+        List<OddsSnapshot> latestBatch = safeSnapshots.stream()
                 .filter(snapshot ->
-                        latestCapturedAt.equals(snapshot.getCapturedAt()))
+                        latestCapturedAt != null
+                                && latestCapturedAt.equals(snapshot.getCapturedAt()))
                 .filter(this::isOneXTwoMarket)
                 .toList();
 
@@ -104,22 +123,25 @@ public class MarketComparisonService {
 
         if (homeSnapshot == null
                 || drawSnapshot == null
-                || awaySnapshot == null) {
+                || awaySnapshot == null
+                || homeSnapshot.getOddValue() == null
+                || drawSnapshot.getOddValue() == null
+                || awaySnapshot.getOddValue() == null
+                || homeSnapshot.getOddValue() <= 0.0
+                || drawSnapshot.getOddValue() <= 0.0
+                || awaySnapshot.getOddValue() <= 0.0) {
 
             return new FixtureMarketComparisonDto(
                     fixture.getId(),
                     fixture.getHomeTeam().getTeamName(),
                     fixture.getAwayTeam().getTeamName(),
                     fixture.getKickoffAt(),
-                    new FixtureMarketComparisonDto.ModelProbabilities(
-                            latestPrediction.getHomeWinProbability(),
-                            latestPrediction.getDrawProbability(),
-                            latestPrediction.getAwayWinProbability()
-                    ),
+                    modelProbabilities,
                     null,
                     null,
                     null,
-                    latestCapturedAt
+                    latestCapturedAt,
+                    oddsMovement
             );
         }
 
@@ -158,12 +180,8 @@ public class MarketComparisonService {
                 fixture.getHomeTeam().getTeamName(),
                 fixture.getAwayTeam().getTeamName(),
                 fixture.getKickoffAt(),
-                new FixtureMarketComparisonDto.ModelProbabilities(
-                        modelHome,
-                        modelDraw,
-                        modelAway
-                ),
-                new FixtureMarketComparisonDto.MarketOdds(
+                modelProbabilities,
+                new MarketOdds(
                         homeOdds,
                         drawOdds,
                         awayOdds,
@@ -174,13 +192,220 @@ public class MarketComparisonService {
                         normalizedDraw,
                         normalizedAway
                 ),
-                new FixtureMarketComparisonDto.EdgeSummary(
+                new EdgeSummary(
                         edgeHome,
                         edgeDraw,
                         edgeAway
                 ),
                 bestEdgeSelection,
-                latestCapturedAt
+                latestCapturedAt,
+                oddsMovement
+        );
+    }
+
+    private OddsMovement buildOddsMovement(
+            Fixture fixture,
+            List<OddsSnapshot> odds) {
+
+        if (odds == null || odds.isEmpty()) {
+            return unavailableOddsMovement(
+                    "Nu avem cote capturate pentru acest fixture."
+            );
+        }
+
+        List<MarketPoint> points =
+                buildCompleteMarketPoints(fixture, odds);
+
+        if (points.size() < 2) {
+            return unavailableOddsMovement(
+                    "Avem nevoie de cel puțin două capturi complete de cote pentru odds movement."
+            );
+        }
+
+        MarketPoint first = points.get(0);
+        MarketPoint latest = points.get(points.size() - 1);
+
+        SelectionMovement home =
+                selectionMovement(
+                        "HOME",
+                        first.homeOdd(),
+                        latest.homeOdd(),
+                        first.homeProbability(),
+                        latest.homeProbability()
+                );
+
+        SelectionMovement draw =
+                selectionMovement(
+                        "DRAW",
+                        first.drawOdd(),
+                        latest.drawOdd(),
+                        first.drawProbability(),
+                        latest.drawProbability()
+                );
+
+        SelectionMovement away =
+                selectionMovement(
+                        "AWAY",
+                        first.awayOdd(),
+                        latest.awayOdd(),
+                        first.awayProbability(),
+                        latest.awayProbability()
+                );
+
+        SelectionMovement strongest =
+                strongestMove(home, draw, away);
+
+        return new OddsMovement(
+                true,
+                first.capturedAt().toString(),
+                latest.capturedAt().toString(),
+                home,
+                draw,
+                away,
+                strongest.selection(),
+                strongest.direction(),
+                strongest.impliedProbabilityDelta(),
+                oddsMovementSummary(strongest)
+        );
+    }
+
+    private List<MarketPoint> buildCompleteMarketPoints(
+            Fixture fixture,
+            List<OddsSnapshot> odds) {
+
+        Map<OffsetDateTime, MarketPointBuilder> byCapturedAt =
+                new HashMap<>();
+
+        for (OddsSnapshot snapshot : odds) {
+            if (!isOneXTwoMarket(snapshot)) {
+                continue;
+            }
+
+            String outcome =
+                    normalizeOutcome(snapshot);
+
+            if (outcome == null
+                    || "OTHER".equals(outcome)
+                    || snapshot.getCapturedAt() == null
+                    || snapshot.getOddValue() == null
+                    || snapshot.getOddValue() <= 0.0) {
+                continue;
+            }
+
+            MarketPointBuilder builder =
+                    byCapturedAt.computeIfAbsent(
+                            snapshot.getCapturedAt(),
+                            ignored -> new MarketPointBuilder(
+                                    snapshot.getCapturedAt()
+                            )
+                    );
+
+            if ("HOME".equals(outcome)) {
+                builder.homeOdd = snapshot.getOddValue();
+            } else if ("DRAW".equals(outcome)) {
+                builder.drawOdd = snapshot.getOddValue();
+            } else if ("AWAY".equals(outcome)) {
+                builder.awayOdd = snapshot.getOddValue();
+            }
+        }
+
+        return byCapturedAt.values()
+                .stream()
+                .filter(MarketPointBuilder::isComplete)
+                .map(MarketPointBuilder::build)
+                .sorted(Comparator.comparing(MarketPoint::capturedAt))
+                .toList();
+    }
+
+    private SelectionMovement selectionMovement(
+            String selection,
+            Double firstOdd,
+            Double latestOdd,
+            Double firstProbability,
+            Double latestProbability) {
+
+        double probabilityDelta =
+                latestProbability - firstProbability;
+
+        String direction;
+
+        if (probabilityDelta >= 0.01) {
+            direction = "STEAM_IN";
+        } else if (probabilityDelta <= -0.01) {
+            direction = "DRIFT_OUT";
+        } else {
+            direction = "STABLE";
+        }
+
+        return new SelectionMovement(
+                selection,
+                firstOdd,
+                latestOdd,
+                latestOdd - firstOdd,
+                firstProbability,
+                latestProbability,
+                probabilityDelta,
+                direction
+        );
+    }
+
+    private SelectionMovement strongestMove(
+            SelectionMovement home,
+            SelectionMovement draw,
+            SelectionMovement away) {
+
+        List<SelectionMovement> movements =
+                new ArrayList<>();
+
+        movements.add(home);
+        movements.add(draw);
+        movements.add(away);
+
+        return movements.stream()
+                .max(Comparator.comparingDouble(
+                        movement ->
+                                Math.abs(
+                                        movement.impliedProbabilityDelta()
+                                )
+                ))
+                .orElse(home);
+    }
+
+    private String oddsMovementSummary(SelectionMovement strongest) {
+        if (strongest == null) {
+            return "Nu există mișcare relevantă de cote.";
+        }
+
+        String selection = strongest.selection();
+        String direction = strongest.direction();
+
+        if ("STEAM_IN".equals(direction)) {
+            return "Piața a intrat pe selecția "
+                    + selection
+                    + ". Probabilitatea implicită a crescut.";
+        }
+
+        if ("DRIFT_OUT".equals(direction)) {
+            return "Piața s-a îndepărtat de selecția "
+                    + selection
+                    + ". Probabilitatea implicită a scăzut.";
+        }
+
+        return "Cotele sunt relativ stabile. Nu există mișcare puternică de piață.";
+    }
+
+    private OddsMovement unavailableOddsMovement(String summary) {
+        return new OddsMovement(
+                false,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                summary
         );
     }
 
@@ -239,5 +464,52 @@ public class MarketComparisonService {
         return value == null
                 ? ""
                 : value.trim().toLowerCase(Locale.ROOT);
+    }
+
+    private record MarketPoint(
+            OffsetDateTime capturedAt,
+            Double homeOdd,
+            Double drawOdd,
+            Double awayOdd,
+            Double homeProbability,
+            Double drawProbability,
+            Double awayProbability
+    ) {
+    }
+
+    private static class MarketPointBuilder {
+
+        private final OffsetDateTime capturedAt;
+        private Double homeOdd;
+        private Double drawOdd;
+        private Double awayOdd;
+
+        private MarketPointBuilder(OffsetDateTime capturedAt) {
+            this.capturedAt = capturedAt;
+        }
+
+        private boolean isComplete() {
+            return homeOdd != null
+                    && drawOdd != null
+                    && awayOdd != null;
+        }
+
+        private MarketPoint build() {
+            double homeRaw = 1.0 / homeOdd;
+            double drawRaw = 1.0 / drawOdd;
+            double awayRaw = 1.0 / awayOdd;
+
+            double total = homeRaw + drawRaw + awayRaw;
+
+            return new MarketPoint(
+                    capturedAt,
+                    homeOdd,
+                    drawOdd,
+                    awayOdd,
+                    homeRaw / total,
+                    drawRaw / total,
+                    awayRaw / total
+            );
+        }
     }
 }

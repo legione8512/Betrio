@@ -1,6 +1,8 @@
 package ro.betrio.backend.service.sync;
 
 import java.time.OffsetDateTime;
+import java.util.HashSet;
+import java.util.Set;
 
 import java.util.List;
 
@@ -172,11 +174,14 @@ public class SquadAndAvailabilitySyncService {
         JsonNode root = apiFootballClient.getInjuriesByFixture(fixture.getExternalFixtureId());
 
         fixtureAbsenceRepository.deleteByFixtureId(fixture.getId());
+        fixtureAbsenceRepository.flush();
 
         JsonNode response = root != null ? root.path("response") : null;
         if (response == null || !response.isArray()) {
             return;
         }
+
+        Set<String> savedAbsenceKeys = new HashSet<>();
 
         for (JsonNode item : response) {
             Long externalTeamId = longOrNull(item.path("team"), "id");
@@ -188,6 +193,24 @@ public class SquadAndAvailabilitySyncService {
             JsonNode playerNode = item.path("player");
             Long externalPlayerId = longOrNull(playerNode, "id");
             String playerName = textOrNull(playerNode, "name");
+            String absenceType = textOrNull(playerNode, "type");
+            String reasonText = textOrNull(playerNode, "reason");
+
+            if (playerName == null || playerName.isBlank()) {
+                continue;
+            }
+
+            String absenceKey = team.getId()
+                    + "|"
+                    + (externalPlayerId != null ? externalPlayerId : playerName)
+                    + "|"
+                    + absenceType
+                    + "|"
+                    + reasonText;
+
+            if (!savedAbsenceKeys.add(absenceKey)) {
+                continue;
+            }
 
             Player player = upsertMinimalPlayer(
                     externalPlayerId,
@@ -195,21 +218,13 @@ public class SquadAndAvailabilitySyncService {
                     textOrNull(playerNode, "photo")
             );
 
-            FixtureAbsence absence = fixtureAbsenceRepository
-                    .findByFixtureIdAndTeamIdAndPlayerNameAndAbsenceTypeAndReasonText(
-                            fixture.getId(),
-                            team.getId(),
-                            playerName,
-                            textOrNull(item, "type"),
-                            textOrNull(item, "reason"))
-                    .orElseGet(FixtureAbsence::new);
-
+            FixtureAbsence absence = new FixtureAbsence();
             absence.setFixture(fixture);
             absence.setTeam(team);
             absence.setPlayer(player);
             absence.setPlayerName(playerName);
-            absence.setAbsenceType(textOrNull(item, "type"));
-            absence.setReasonText(textOrNull(item, "reason"));
+            absence.setAbsenceType(absenceType);
+            absence.setReasonText(reasonText);
 
             fixtureAbsenceRepository.save(absence);
         }
