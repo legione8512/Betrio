@@ -8,7 +8,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
-
+import ro.betrio.backend.domain.entity.FixtureAbsence;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -404,28 +404,25 @@ public class FeatureBuilderService {
             }
         }
 
-        long knownAbsences =
-                fixtureAbsenceRepository.countByFixtureIdAndTeamId(
+        List<FixtureAbsence> fixtureAbsences =
+                fixtureAbsenceRepository.findByFixtureIdAndTeamId(
                         fixtureId,
                         targetTeam.getId()
                 );
 
-        long missingFixtureAbsences =
-                fixtureAbsenceRepository.countByFixtureIdAndTeamIdAndAbsenceType(
-                        fixtureId,
-                        targetTeam.getId(),
-                        "Missing Fixture"
-                );
+        long knownAbsences = fixtureAbsences.size();
 
-        long questionableAbsences =
-                fixtureAbsenceRepository.countByFixtureIdAndTeamIdAndAbsenceType(
-                        fixtureId,
-                        targetTeam.getId(),
-                        "Questionable"
-                );
+        long missingFixtureAbsences = fixtureAbsences.stream()
+                .filter(absence -> containsIgnoreCase(absence.getAbsenceType(), "missing"))
+                .count();
 
-        double absenceImpactScore =
-                missingFixtureAbsences + (0.5 * questionableAbsences);
+        long questionableAbsences = fixtureAbsences.stream()
+                .filter(absence -> containsIgnoreCase(absence.getAbsenceType(), "questionable"))
+                .count();
+
+        double absenceImpactScore = fixtureAbsences.stream()
+                .mapToDouble(this::absenceImpactScore)
+                .sum();
 
         return new TeamFormSnapshotDto(
                 targetTeam.getId(),
@@ -448,6 +445,42 @@ public class FeatureBuilderService {
                 questionableAbsences,
                 absenceImpactScore
         );
+    }
+    
+    private double absenceImpactScore(FixtureAbsence absence) {
+        String type = absence.getAbsenceType();
+        String reason = absence.getReasonText();
+
+        double score = 0.6;
+
+        if (containsIgnoreCase(type, "missing")) {
+            score = 1.0;
+        } else if (containsIgnoreCase(type, "suspended")) {
+            score = 0.9;
+        } else if (containsIgnoreCase(type, "questionable")) {
+            score = 0.35;
+        }
+
+        if (containsIgnoreCase(reason, "knee")
+                || containsIgnoreCase(reason, "acl")
+                || containsIgnoreCase(reason, "broken")
+                || containsIgnoreCase(reason, "muscle")
+                || containsIgnoreCase(reason, "hamstring")) {
+            score *= 1.15;
+        }
+
+        if (containsIgnoreCase(reason, "illness")
+                || containsIgnoreCase(reason, "flu")) {
+            score *= 0.75;
+        }
+
+        return Math.max(0.2, Math.min(1.3, score));
+    }
+
+    private boolean containsIgnoreCase(String text, String needle) {
+        return text != null
+                && needle != null
+                && text.toLowerCase().contains(needle.toLowerCase());
     }
     
     private double recencyWeight(int index) {
@@ -774,8 +807,8 @@ public class FeatureBuilderService {
         double homeAdvantage =
                 homeSide ? 0.10 : 0.0;
 
-        double absencePenalty =
-                0.08 * attackTeam.absenceImpactScore();
+        double attackAbsencePenalty = Math.min(0.35, 0.07 * attackTeam.absenceImpactScore());
+        double defenceAbsenceBoost = Math.min(0.25, 0.05 * defenceTeam.absenceImpactScore());
         
         double restAdjustment =
                 0.06 * (
@@ -796,7 +829,8 @@ public class FeatureBuilderService {
                         + shotsAdjustment
                         + restAdjustment
                         + strengthAdjustment
-                        - absencePenalty;
+                        - attackAbsencePenalty
+                        + defenceAbsenceBoost;
 
         return clamp(lambda, 0.20, 3.50);
     }

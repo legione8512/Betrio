@@ -1,6 +1,7 @@
 package ro.betrio.backend.service.action;
 
 import java.time.OffsetDateTime;
+import ro.betrio.backend.service.sync.FixtureResultSyncService;
 import java.util.List;
 
 import org.springframework.data.domain.PageRequest;
@@ -28,6 +29,7 @@ public class ManualOperationsService {
     private final ApiFootballProperties apiFootballProperties;
     private final SquadAndAvailabilitySyncService squadAndAvailabilitySyncService;
     private final FixtureStatisticsSyncService fixtureStatisticsSyncService;
+    private final FixtureResultSyncService fixtureResultSyncService;
     private final PredictionPersistenceService predictionPersistenceService;
     private final PredictionEvaluationService predictionEvaluationService;
     private final OddsSnapshotSyncService oddsSnapshotSyncService;
@@ -38,6 +40,7 @@ public class ManualOperationsService {
             ApiFootballProperties apiFootballProperties,
             SquadAndAvailabilitySyncService squadAndAvailabilitySyncService,
             FixtureStatisticsSyncService fixtureStatisticsSyncService,
+            FixtureResultSyncService fixtureResultSyncService,
             PredictionPersistenceService predictionPersistenceService,
             PredictionEvaluationService predictionEvaluationService,
             OddsSnapshotSyncService oddsSnapshotSyncService) {
@@ -46,6 +49,7 @@ public class ManualOperationsService {
         this.apiFootballProperties = apiFootballProperties;
         this.squadAndAvailabilitySyncService = squadAndAvailabilitySyncService;
         this.fixtureStatisticsSyncService = fixtureStatisticsSyncService;
+        this.fixtureResultSyncService = fixtureResultSyncService;
         this.predictionPersistenceService = predictionPersistenceService;
         this.predictionEvaluationService = predictionEvaluationService;
         this.oddsSnapshotSyncService = oddsSnapshotSyncService;
@@ -60,11 +64,10 @@ public class ManualOperationsService {
 
     public ManualActionResultDto smartUpdate(Long fixtureId) {
         return execute("SMART_UPDATE", fixtureId, () -> {
-            Fixture fixture = fixtureRepository.findById(fixtureId)
-                    .orElseThrow(() -> new IllegalStateException("Fixture not found: " + fixtureId));
+        	Fixture fixture = fixtureResultSyncService.refreshFixtureById(fixtureId);
 
-            squadAndAvailabilitySyncService.syncFixtureContextByFixtureId(fixtureId);
-            fixtureStatisticsSyncService.syncFixtureStatisticsByFixtureId(fixtureId);
+        	squadAndAvailabilitySyncService.syncFixtureContextByFixtureId(fixtureId);
+        	fixtureStatisticsSyncService.syncFixtureStatisticsByFixtureId(fixtureId);
 
             if (isFinished(fixture)) {
                 try {

@@ -1,6 +1,8 @@
 package ro.betrio.backend.api.controller;
 
 import java.util.List;
+import ro.betrio.backend.api.dto.report.ValueBetReportDto;
+import ro.betrio.backend.api.dto.report.CalibrationBucketDto;
 import ro.betrio.backend.api.dto.report.ModelVersionPerformanceDto;
 
 import org.springframework.web.bind.annotation.GetMapping;
@@ -39,6 +41,17 @@ public class ReportingController {
     @GetMapping("/model-versions")
     public List<ModelVersionPerformanceDto> getModelVersionPerformance() {
         return reportingService.getModelVersionPerformance();
+    }
+    
+    @GetMapping("/calibration")
+    public List<CalibrationBucketDto> getCalibrationBuckets() {
+        return reportingService.getCalibrationBuckets();
+    }
+    
+    @GetMapping("/value-bets")
+    public ValueBetReportDto getValueBetReport(
+            @RequestParam(defaultValue = "0.03") double minEdge) {
+        return reportingService.getValueBetReport(minEdge);
     }
 
     @GetMapping("/fixture/{fixtureId}")

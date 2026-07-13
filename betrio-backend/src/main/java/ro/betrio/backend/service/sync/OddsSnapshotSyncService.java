@@ -34,8 +34,6 @@ public class OddsSnapshotSyncService {
 
         JsonNode root = apiFootballClient.getOddsByFixture(fixture.getExternalFixtureId());
 
-        oddsSnapshotRepository.deleteByFixtureId(fixture.getId());
-
         JsonNode response = root != null ? root.path("response") : null;
         if (response == null || !response.isArray()) {
             return;

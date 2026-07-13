@@ -303,6 +303,24 @@ public interface FixtureRepository extends JpaRepository<Fixture, Long>, org.spr
             @Param("competitionId") Long competitionId,
             Pageable pageable
     );
+    
+    @Query("""
+            select f
+            from Fixture f
+            join fetch f.homeTeam
+            join fetch f.awayTeam
+            where f.season.competition.id = :competitionId
+              and f.kickoffAt >= :from
+              and f.kickoffAt < :untilExclusive
+            order by f.kickoffAt asc
+            """)
+    List<Fixture> findUpcomingWithTeamsByCompetitionInWindow(
+            @Param("competitionId") Long competitionId,
+            @Param("from") OffsetDateTime from,
+            @Param("untilExclusive") OffsetDateTime untilExclusive,
+            Pageable pageable
+    );
+    
     @Query("""
             select distinct f.leagueRound
             from Fixture f

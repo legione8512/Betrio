@@ -68,15 +68,20 @@ public interface PredictionEvaluationRepository extends JpaRepository<Prediction
     List<PredictionEvaluation> findRecentEvaluations(Pageable pageable);
 
     @Query("""
-        select pe
-        from PredictionEvaluation pe
-        join fetch pe.predictionRun pr
-        join fetch pr.fixture f
-        join fetch f.homeTeam
-        join fetch f.awayTeam
-        where f.id = :fixtureId
-        """)
-    Optional<PredictionEvaluation> findDetailedByFixtureId(Long fixtureId);
+            select pe
+            from PredictionEvaluation pe
+            join fetch pe.predictionRun pr
+            join fetch pr.fixture f
+            join fetch f.homeTeam
+            join fetch f.awayTeam
+            where f.id = :fixtureId
+              and pr.generatedAt < f.kickoffAt
+            order by pr.generatedAt desc, pe.id desc
+            """)
+    List<PredictionEvaluation> findDetailedByFixtureId(
+            Long fixtureId,
+            Pageable pageable
+    );
 
     @Query("""
         select pe
@@ -117,4 +122,38 @@ public interface PredictionEvaluationRepository extends JpaRepository<Prediction
             order by count(e) desc
             """)
     List<ModelVersionPerformanceDto> findModelVersionPerformance();
+    
+    @Query("""
+            select pe
+            from PredictionEvaluation pe
+            join fetch pe.predictionRun pr
+            order by pe.evaluatedAt desc
+            """)
+    List<PredictionEvaluation> findAllForCalibration();
+    @Query("""
+            select pe
+            from PredictionEvaluation pe
+            join fetch pe.predictionRun pr
+            join fetch pr.fixture f
+            join fetch f.homeTeam
+            join fetch f.awayTeam
+            where pr.generatedAt < f.kickoffAt
+              and not exists (
+                  select newerEvaluation.id
+                  from PredictionEvaluation newerEvaluation
+                  join newerEvaluation.predictionRun newerPrediction
+                  where newerPrediction.fixture.id = f.id
+                    and newerPrediction.generatedAt < f.kickoffAt
+                    and (
+                        newerPrediction.generatedAt > pr.generatedAt
+                        or (
+                            newerPrediction.generatedAt = pr.generatedAt
+                            and newerPrediction.id > pr.id
+                        )
+                    )
+              )
+            order by f.kickoffAt desc
+            """)
+    List<PredictionEvaluation>
+            findLatestPreMatchEvaluationPerFixture();
 }

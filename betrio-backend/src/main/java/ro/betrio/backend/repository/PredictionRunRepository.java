@@ -1,6 +1,7 @@
 package ro.betrio.backend.repository;
 
 import java.util.List;
+import java.time.OffsetDateTime;
 import org.springframework.data.domain.Pageable;
 import java.util.Collection;
 
@@ -14,6 +15,13 @@ import ro.betrio.backend.domain.entity.PredictionRun;
 public interface PredictionRunRepository extends JpaRepository<PredictionRun, Long> {
     List<PredictionRun> findByFixtureIdOrderByGeneratedAtDesc(Long fixtureId);
     Optional<PredictionRun> findTopByFixtureIdOrderByGeneratedAtDesc(Long fixtureId);
+    
+    Optional<PredictionRun>
+    findTopByFixtureIdAndGeneratedAtBeforeOrderByGeneratedAtDesc(
+            Long fixtureId,
+            OffsetDateTime kickoffAt
+    );
+    
     @Query("""
     	    select prediction
     	    from PredictionRun prediction

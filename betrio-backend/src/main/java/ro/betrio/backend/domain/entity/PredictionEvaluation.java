@@ -63,6 +63,15 @@ public class PredictionEvaluation {
     @Column(name = "market_away_implied_probability")
     private Double marketAwayImpliedProbability;
 
+    @Column(name = "market_home_odd")
+    private Double marketHomeOdd;
+
+    @Column(name = "market_draw_odd")
+    private Double marketDrawOdd;
+
+    @Column(name = "market_away_odd")
+    private Double marketAwayOdd;
+    
     @Column(name = "model_edge_home")
     private Double modelEdgeHome;
 
@@ -124,6 +133,15 @@ public class PredictionEvaluation {
     public Double getMarketAwayImpliedProbability() { return marketAwayImpliedProbability; }
     public void setMarketAwayImpliedProbability(Double marketAwayImpliedProbability) { this.marketAwayImpliedProbability = marketAwayImpliedProbability; }
 
+    public Double getMarketHomeOdd() { return marketHomeOdd; }
+    public void setMarketHomeOdd(Double marketHomeOdd) { this.marketHomeOdd = marketHomeOdd; }
+
+    public Double getMarketDrawOdd() { return marketDrawOdd; }
+    public void setMarketDrawOdd(Double marketDrawOdd) { this.marketDrawOdd = marketDrawOdd; }
+
+    public Double getMarketAwayOdd() { return marketAwayOdd; }
+    public void setMarketAwayOdd(Double marketAwayOdd) { this.marketAwayOdd = marketAwayOdd; }
+    
     public Double getModelEdgeHome() { return modelEdgeHome; }
     public void setModelEdgeHome(Double modelEdgeHome) { this.modelEdgeHome = modelEdgeHome; }
 

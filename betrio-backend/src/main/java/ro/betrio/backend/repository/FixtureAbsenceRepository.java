@@ -1,7 +1,7 @@
 package ro.betrio.backend.repository;
 
 import java.util.Optional;
-
+import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -34,4 +34,5 @@ public interface FixtureAbsenceRepository extends JpaRepository<FixtureAbsence, 
             @Param("teamId") Long teamId,
             @Param("absenceType") String absenceType
     );
+    List<FixtureAbsence> findByFixtureIdAndTeamId(Long fixtureId, Long teamId);
 }

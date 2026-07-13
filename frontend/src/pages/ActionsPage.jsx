@@ -140,20 +140,30 @@ export function ActionsPage({ competitionId, competition }) {
           </button>
         </div>
 
-        <div className="inline-form wrap" style={{ marginTop: "12px" }}>
+        <div style={{ marginTop: "12px" }}>
           <input
             value={batchLimit}
             onChange={(e) => setBatchLimit(e.target.value)}
-            placeholder="Batch limit"
+            placeholder="Număr maxim de meciuri"
           />
+          <div className="muted" style={{ marginTop: "8px",
+      marginBottom: "10px", }}>
+  Selecteaza numarul de meciuri ce vor fi procesate, maximum {batchLimit || 50}, din competiția selectată.
+</div>
+
           <button
             className="primary"
             onClick={runCompetitionBatchPreMatchCapture}
             disabled={!competitionId}
           >
-            POST competition batch pre-match capture
+            Generează predicțiile până duminică
           </button>
         </div>
+        
+
+        <div className="muted" style={{ marginTop: "8px" }}>
+  Salvează cotele disponibile și generează o predicție pentru fiecare meci fără predicție, de acum până duminică inclusiv.
+</div>
 
         <div className="muted" style={{ marginTop: "10px" }}>
           Selected competition: {competition ? competition.name : "None"}

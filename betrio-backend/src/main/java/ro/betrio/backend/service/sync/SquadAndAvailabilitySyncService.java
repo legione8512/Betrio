@@ -111,6 +111,30 @@ public class SquadAndAvailabilitySyncService {
         syncLineups(fixture);
         syncInjuries(fixture);
     }
+    
+    @Transactional
+    public void syncFixtureLineupsByFixtureId(Long fixtureId) {
+        Fixture fixture = fixtureRepository.findById(fixtureId)
+                .orElseThrow(() ->
+                        new IllegalStateException(
+                                "Fixture not found: " + fixtureId
+                        )
+                );
+
+        syncLineups(fixture);
+    }
+
+    @Transactional
+    public void syncFixtureInjuriesByFixtureId(Long fixtureId) {
+        Fixture fixture = fixtureRepository.findById(fixtureId)
+                .orElseThrow(() ->
+                        new IllegalStateException(
+                                "Fixture not found: " + fixtureId
+                        )
+                );
+
+        syncInjuries(fixture);
+    }
 
     @Transactional
     public void syncCurrentSeasonWindow(int currentSeasonYear, int daysBack, int daysAhead) {
@@ -129,12 +153,15 @@ public class SquadAndAvailabilitySyncService {
     }
 
     private void syncLineups(Fixture fixture) {
-        JsonNode root = apiFootballClient.getLineupsByFixture(fixture.getExternalFixtureId());
+    	JsonNode root = apiFootballClient.getLineupsByFixture(fixture.getExternalFixtureId());
 
-        fixtureTeamSheetRepository.deleteByFixtureId(fixture.getId());
-        fixtureLineupRepository.deleteByFixtureId(fixture.getId());
+    	fixtureLineupRepository.deleteByFixtureId(fixture.getId());
+    	fixtureLineupRepository.flush();
 
-        JsonNode response = root != null ? root.path("response") : null;
+    	fixtureTeamSheetRepository.deleteByFixtureId(fixture.getId());
+    	fixtureTeamSheetRepository.flush();
+
+    	JsonNode response = root != null ? root.path("response") : null;
         if (response == null || !response.isArray()) {
             return;
         }

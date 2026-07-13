@@ -44,6 +44,7 @@ public class FixtureStatisticsSyncService {
         JsonNode root = apiFootballClient.getFixtureStatistics(fixture.getExternalFixtureId());
 
         fixtureTeamStatRepository.deleteByFixtureId(fixture.getId());
+        fixtureTeamStatRepository.flush();
 
         JsonNode response = root != null ? root.path("response") : null;
         if (response == null || !response.isArray()) {

@@ -64,6 +64,16 @@ public class ApiFootballClient {
     public ApiFootballFixturesResponse getFixturesBySeason(int season) {
         return getFixturesBySeason(properties.getLeagueId(), season);
     }
+    
+    public ApiFootballFixturesResponse getFixtureById(long fixtureId) {
+        return restClient.get()
+                .uri(uriBuilder -> uriBuilder
+                        .path("/fixtures")
+                        .queryParam("id", fixtureId)
+                        .build())
+                .retrieve()
+                .body(ApiFootballFixturesResponse.class);
+    }
 
     public ApiFootballFixturesResponse getFixturesBySeason(long leagueId, int season) {
         return restClient.get()
